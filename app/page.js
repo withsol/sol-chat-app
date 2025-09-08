@@ -9,7 +9,7 @@ export default function SolApp() {
     {
       id: 1,
       role: 'sol',
-      content: "Hello! I'm Sol™, your AI business partner and intuition amplifier. I'm here to support you through your unique journey of becoming, using the Aligned Business® Method and everything I learn about you along the way.\n\nWhat's on your mind today? You can share anything - your thoughts, challenges, wins, or just what's coming up for you right now. I'm here to hold space for all of it.",
+      content: "Hi 👋 I'm Sol. What's coming up for you today?",
       timestamp: new Date().toISOString(),
       tags: ['welcome', 'introduction']
     }
@@ -309,7 +309,7 @@ export default function SolApp() {
                 <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
                   S
                 </div>
-                <span className="text-sm font-medium text-purple-600">Sol™ is connecting with Claude...</span>
+                <span className="text-sm font-medium text-purple-600">Sol™ is thinking...</span>
               </div>
               <div className="flex space-x-1">
                 <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
@@ -367,7 +367,7 @@ export default function SolApp() {
           </div>
           
           <div className="mt-2 text-xs text-gray-500 text-center">
-            Everything you share builds your Personalgorithm™ • Powered by Claude AI & stored in your Lore™ database
+            Everything you share builds your Personalgorithm™ • Powered by your Lore™ memory database
           </div>
         </div>
       </div>
