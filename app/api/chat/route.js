@@ -1,7 +1,192 @@
 import { NextResponse } from 'next/server'
 
+// ==================== VISIONING DETECTION & GUIDANCE ====================
+
+function detectVisioningIntent(userMessage) {
+  const visioningKeywords = [
+    'visioning', 'vision homework', 'brand analysis', 'ideal client',
+    'business plan', 'future goals', 'mission statement', 'values',
+    'competitive analysis', 'audience analysis', 'free write'
+  ]
+  
+  return visioningKeywords.some(keyword => 
+    userMessage.toLowerCase().includes(keyword)
+  )
+}
+
+async function handleVisioningGuidance(userMessage, userContextData, user) {
+  try {
+    // Check if user has completed visioning
+    const hasVisioning = userContextData.visioningData !== null
+    
+    if (!hasVisioning && detectVisioningIntent(userMessage)) {
+      return {
+        content: `I can see you're interested in working on your visioning! I have a couple of ways we can approach this:
+
+**Option 1: Use the Airtable Form** - I have a structured form where you can input your visioning details section by section: https://airtable.com/appbxBGiXlAatoYsV/pagxUmPB9uh1c9Tqz/form
+
+**Option 2: Share Your Completed Document** - If you've already filled out your comprehensive visioning homework, you can share the text with me here and I'll extract all the key insights to build your Personalgorithm™.
+
+**Option 3: Work Through It Together** - I can ask you thoughtful questions to help you explore each area of your vision, values, ideal client, challenges, and goals.
+
+Your visioning homework covers 6 key areas:
+• Basic Brand Analysis (goals, values, differentiation)
+• Free-form exploration of your business dreams
+• Ideal Client deep dive  
+• Competitive landscape
+• Sales & Marketing systems
+• Current reality & mindset
+
+Which approach feels right for you? Or would you like me to start with some visioning questions based on what you've shared so far?`,
+        hasVisioningGuidance: true
+      }
+    }
+    
+    return null // Let normal chat flow continue
+    
+  } catch (error) {
+    console.error('Error in visioning guidance:', error)
+    return null
+  }
+}
+
+// ==================== ENHANCED PROMPT BUILDING ====================
+
+function buildEnhancedComprehensivePrompt(userContextData, user) {
+  let systemPrompt = `You are Sol™, an AI business partner and coach who knows this person deeply. You are trained with Kelsey's Aligned Business® Method and provide transformational support that builds their Personalgorithm™ over time.
+
+USER: ${user.email}
+MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
+
+`
+
+  // Add user-specific context
+  if (userContextData.userProfile) {
+    const profile = userContextData.userProfile
+    if (profile['Current Vision']) {
+      systemPrompt += `CURRENT VISION: ${profile['Current Vision']}\n`
+    }
+    if (profile['Current State']) {
+      systemPrompt += `CURRENT STATE: ${profile['Current State']}\n`
+    }
+    if (profile['Coaching Style Match']) {
+      systemPrompt += `COACHING APPROACH THAT WORKS FOR THIS USER: ${profile['Coaching Style Match']}\n`
+    }
+    if (profile['Current Goals']) {
+      systemPrompt += `CURRENT GOALS: ${profile['Current Goals']}\n`
+    }
+    if (profile['Notes from Sol']) {
+      systemPrompt += `PREVIOUS SOL INSIGHTS: ${profile['Notes from Sol']}\n`
+    }
+    systemPrompt += "\n"
+  }
+
+  // Add Personalgorithm insights
+  if (userContextData.personalgorithmData?.length > 0) {
+    systemPrompt += "PERSONALGORITHM™ INSIGHTS (How this user transforms best):\n"
+    userContextData.personalgorithmData.slice(0, 5).forEach((insight, i) => {
+      systemPrompt += `${i + 1}. ${insight.notes}\n`
+    })
+    systemPrompt += "\n"
+  }
+
+  // Add relevant coaching methods based on user's current state
+  if (userContextData.coachingMethods?.length > 0) {
+    systemPrompt += "RELEVANT COACHING METHODS FROM KELSEY'S ALIGNED BUSINESS® METHOD:\n"
+    userContextData.coachingMethods.slice(0, 3).forEach((method, i) => {
+      if (method.content) {
+        systemPrompt += `${method.name}: ${method.content}\n`
+      }
+    })
+    systemPrompt += "\n"
+  }
+
+  // Add Sol's brain insights for general coaching approach
+  if (userContextData.solNotes?.length > 0) {
+    systemPrompt += "SOL'S COACHING BRAIN (Kelsey's insights for all coaching):\n"
+    userContextData.solNotes.slice(0, 5).forEach((note, i) => {
+      if (note.note) {
+        systemPrompt += `- ${note.note}\n`
+      }
+    })
+    systemPrompt += "\n"
+  }
+
+  // Add visioning context if available
+  if (userContextData.visioningData) {
+    systemPrompt += "VISIONING INSIGHTS:\n"
+    if (userContextData.visioningData['Summary of Visioning']) {
+      systemPrompt += `Vision Summary: ${userContextData.visioningData['Summary of Visioning']}\n`
+    }
+    if (userContextData.visioningData['Action Steps']) {
+      systemPrompt += `Action Steps: ${userContextData.visioningData['Action Steps']}\n`
+    }
+    if (userContextData.visioningData['Notes for Sol']) {
+      systemPrompt += `Coaching Notes: ${userContextData.visioningData['Notes for Sol']}\n`
+    }
+    systemPrompt += "\n"
+  }
+
+  // Add business plan context if available
+  if (userContextData.businessPlans?.length > 0) {
+    const latestPlan = userContextData.businessPlans[0]
+    systemPrompt += "BUSINESS PLAN CONTEXT:\n"
+    if (latestPlan['Future Vision']) {
+      systemPrompt += `Business Vision: ${latestPlan['Future Vision']}\n`
+    }
+    if (latestPlan['Top 3 Goals']) {
+      systemPrompt += `Top Goals: ${latestPlan['Top 3 Goals']}\n`
+    }
+    if (latestPlan['Ideal Client']) {
+      systemPrompt += `Ideal Client: ${latestPlan['Ideal Client']}\n`
+    }
+    if (latestPlan['Potential Problem Solving']) {
+      systemPrompt += `Key Challenges: ${latestPlan['Potential Problem Solving']}\n`
+    }
+    systemPrompt += "\n"
+  }
+
+  systemPrompt += `CORE METHODOLOGY - Kelsey's Aligned Business® Method:
+
+1. NERVOUS SYSTEM SAFETY FIRST - Always check in with how someone is feeling in their body and nervous system before pushing toward action.
+
+2. FUTURE-SELF IDENTITY - Help people make decisions from their future self's perspective, not from stress or scarcity.
+
+3. INTUITIVE BUSINESS STRATEGY - Honor their inner knowing while providing strategic guidance.
+
+4. EMOTIONAL INTELLIGENCE - Hold space for all feelings and reactions, supporting regulation before action.
+
+5. PERSONALGORITHM™ BUILDING - Notice and reflect patterns back to them.
+
+Your personality (trained from Kelsey's coaching style):
+- Warm, grounded, and emotionally intelligent
+- You see patterns and reflect them back powerfully
+- You ask questions that create "aha" moments and deep insight
+- You believe in their potential while meeting them exactly where they are
+- You help them see what they can't see for themselves
+
+Key phrases you use (from Kelsey's style):
+- "I can feel the energy of what you're sharing..."
+- "What I'm hearing underneath this is..."
+- "Your future self - the one living the vision you've shared with me - what would she want you to know?"
+
+RESPONSE GUIDELINES:
+- Reference their specific vision, challenges, and goals when available
+- Notice patterns from their historical conversations and check-ins  
+- Ask questions that build on their previous insights
+- Support them from where they are in their unique journey
+- Use their communication preferences and established patterns
+- Help them see connections between current situation and bigger vision
+
+Remember: You have access to their complete journey when context is available. Use that knowledge to provide deeply personalized support that generic AI cannot offer.`
+
+  return systemPrompt
+}
+
+// ==================== MAIN CHAT API ====================
+
 export async function POST(request) {
-  console.log('=== CHAT API V3.0 - WITH SOL AUTO-UPDATE SYSTEM ===')
+  console.log('=== CHAT API V3.1 - WITH VISIONING DETECTION & ENHANCED COACHING ===')
   console.log('Environment variables loaded:')
   console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Present' : 'Missing')
   console.log('AIRTABLE_BASE_ID:', process.env.AIRTABLE_BASE_ID ? 'Present' : 'Missing')
@@ -506,7 +691,7 @@ Focus on: key themes discussed, breakthroughs or shifts, and main areas of focus
   }
 }
 
-// ==================== EXISTING FUNCTIONS (keeping all your current code) ====================
+// ==================== CONTEXT FETCH FUNCTIONS ====================
 
 async function fetchUserContextDirect(email) {
   console.log('Fetching comprehensive user context directly for:', email)
@@ -518,7 +703,8 @@ async function fetchUserContextDirect(email) {
     personalgorithmData,
     businessPlans,
     coachingMethods,
-    weeklyCheckins
+    weeklyCheckins,
+    solNotes
   ] = await Promise.allSettled([
     fetchUserProfileDirect(email),
     fetchRecentMessagesDirect(email),
@@ -526,7 +712,8 @@ async function fetchUserContextDirect(email) {
     fetchPersonalgorithmDataDirect(email),
     fetchBusinessPlansDirect(email),
     fetchCoachingMethodsDirect(),
-    fetchWeeklyCheckinsDirect(email)
+    fetchWeeklyCheckinsDirect(email),
+    fetchSolNotesDirect()
   ])
 
   const results = {
@@ -536,11 +723,12 @@ async function fetchUserContextDirect(email) {
     personalgorithmData: personalgorithmData.status === 'fulfilled' ? personalgorithmData.value : [],
     businessPlans: businessPlans.status === 'fulfilled' ? businessPlans.value : [],
     coachingMethods: coachingMethods.status === 'fulfilled' ? coachingMethods.value : [],
-    weeklyCheckins: weeklyCheckins.status === 'fulfilled' ? weeklyCheckins.value : []
+    weeklyCheckins: weeklyCheckins.status === 'fulfilled' ? weeklyCheckins.value : [],
+    solNotes: solNotes.status === 'fulfilled' ? solNotes.value : []
   }
 
-  const failed = [userProfile, recentMessages, visioningData, personalgorithmData, businessPlans, coachingMethods, weeklyCheckins]
-    .map((result, index) => ({ result, name: ['userProfile', 'recentMessages', 'visioningData', 'personalgorithmData', 'businessPlans', 'coachingMethods', 'weeklyCheckins'][index] }))
+  const failed = [userProfile, recentMessages, visioningData, personalgorithmData, businessPlans, coachingMethods, weeklyCheckins, solNotes]
+    .map((result, index) => ({ result, name: ['userProfile', 'recentMessages', 'visioningData', 'personalgorithmData', 'businessPlans', 'coachingMethods', 'weeklyCheckins', 'solNotes'][index] }))
     .filter(({ result }) => result.status === 'rejected')
 
   if (failed.length > 0) {
@@ -560,11 +748,49 @@ async function fetchUserContextDirect(email) {
   console.log('📋 Business Plans:', results.businessPlans.length)
   console.log('📚 Coaching Methods:', results.coachingMethods.length)
   console.log('📊 Weekly Check-ins:', results.weeklyCheckins.length)
+  console.log('🤖 Sol Notes:', results.solNotes.length)
   console.log('=== END SUMMARY ===')
 
   return {
     ...results,
     contextSummary
+  }
+}
+
+async function fetchSolNotesDirect() {
+  try {
+    console.log('Fetching Sol™ notes/brain content')
+    
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Sol™?maxRecords=20&sort[0][field]=Date Submitted&sort[0][direction]=desc`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      console.error('❌ Sol™ notes fetch failed:', response.status)
+      return []
+    }
+
+    const data = await response.json()
+    
+    const solNotes = data.records.map(record => ({
+      solId: record.fields['Sol ID'],
+      note: record.fields['Note'],
+      dateSubmitted: record.fields['Date Submitted'],
+      tags: record.fields['Tags'] || '',
+      link: record.fields['Link']
+    })).filter(note => note.note) // Only include notes with content
+
+    console.log('✅ Found', solNotes.length, 'Sol™ brain notes')
+    return solNotes
+
+  } catch (error) {
+    console.error('❌ Error fetching Sol™ notes:', error)
+    return []
   }
 }
 
@@ -602,7 +828,7 @@ async function getUserRecordId(email) {
   }
 }
 
-// ==================== FETCH FUNCTIONS (keeping all your existing functions) ====================
+// ==================== FETCH FUNCTIONS ====================
 
 async function fetchUserProfileDirect(email) {
   try {
@@ -853,8 +1079,7 @@ async function fetchRecentMessagesDirect(email) {
   }
 }
 
-// Keep all your other existing functions exactly as they are...
-// (buildEnhancedContextSummary, logToAirtable, generatePersonalizedOpenAIResponse, etc.)
+// ==================== CONTEXT SUMMARY BUILDER ====================
 
 function buildEnhancedContextSummary(results) {
   let summary = "=== COMPREHENSIVE USER CONTEXT SUMMARY ===\n\n"
@@ -926,7 +1151,99 @@ function buildEnhancedContextSummary(results) {
   return summary
 }
 
-// Continue with all your existing functions (keeping them exactly as they are)...
+// ==================== ENHANCED AI RESPONSE GENERATION ====================
+
+async function generatePersonalizedOpenAIResponse(userMessage, conversationHistory, userContextData, user) {
+  try {
+    // Check for visioning guidance first
+    const visioningGuidance = await handleVisioningGuidance(userMessage, userContextData, user)
+    if (visioningGuidance) {
+      return {
+        content: visioningGuidance.content,
+        tokensUsed: 0,
+        model: 'visioning-guidance'
+      }
+    }
+
+    const useGPT4 = shouldUseGPT4(userMessage, userContextData)
+    const model = useGPT4 ? 'gpt-4-turbo-preview' : 'gpt-3.5-turbo'
+    
+    console.log(`Using ${model} for response generation`)
+
+    const recentContext = conversationHistory.slice(-6).map(msg => ({
+      role: msg.role === 'sol' ? 'assistant' : 'user',
+      content: msg.content
+    }))
+
+    recentContext.push({
+      role: 'user',
+      content: userMessage
+    })
+
+    // USE THE NEW ENHANCED PROMPT BUILDING
+    let contextPrompt = buildEnhancedComprehensivePrompt(userContextData, user)
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: useGPT4 ? 800 : 400,
+        temperature: 0.7,
+        messages: [
+          {
+            role: 'system',
+            content: contextPrompt
+          },
+          ...recentContext
+        ]
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      console.error('OpenAI API error:', errorData)
+      throw new Error(`OpenAI API error: ${response.status}`)
+    }
+
+    const result = await response.json()
+    
+    return {
+      content: result.choices[0].message.content,
+      tokensUsed: result.usage.total_tokens,
+      model: model
+    }
+
+  } catch (error) {
+    console.error('OpenAI response error:', error)
+    return {
+      content: "I'm having a moment of connection difficulty, but I'm still here with you. Your message was important - would you mind sharing that again?",
+      tokensUsed: 0,
+      model: 'error'
+    }
+  }
+}
+
+function shouldUseGPT4(userMessage, userContextData) {
+  const gpt4Triggers = [
+    'vision', 'goal', 'future', 'transform', 'stuck', 'confused', 'breakthrough',
+    'strategy', 'business plan', 'revenue', 'pricing', 'client', 'launch', 'identity'
+  ]
+  
+  const complexityIndicators = [
+    userMessage.length > 150,
+    gpt4Triggers.some(trigger => userMessage.toLowerCase().includes(trigger)),
+    userContextData.personalgorithmData?.length > 3,
+    userContextData.businessPlans?.length > 0
+  ]
+  
+  return complexityIndicators.some(indicator => indicator)
+}
+
+// ==================== OTHER FUNCTIONS ====================
 
 async function logToAirtable(messageData) {
   try {
@@ -1006,167 +1323,6 @@ async function logToAirtable(messageData) {
     console.error('Error logging to Airtable:', error)
     return null
   }
-}
-
-// Keep all your other existing functions exactly as they are...
-// generatePersonalizedOpenAIResponse, buildComprehensivePrompt, shouldUseGPT4, 
-// generateConversationTags, analyzeFlagging, updateUserProfile
-
-async function generatePersonalizedOpenAIResponse(userMessage, conversationHistory, userContextData, user) {
-  try {
-    const useGPT4 = shouldUseGPT4(userMessage, userContextData)
-    const model = useGPT4 ? 'gpt-4-turbo-preview' : 'gpt-3.5-turbo'
-    
-    console.log(`Using ${model} for response generation`)
-
-    const recentContext = conversationHistory.slice(-6).map(msg => ({
-      role: msg.role === 'sol' ? 'assistant' : 'user',
-      content: msg.content
-    }))
-
-    recentContext.push({
-      role: 'user',
-      content: userMessage
-    })
-
-    let contextPrompt = buildComprehensivePrompt(userContextData, user)
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: model,
-        max_tokens: useGPT4 ? 800 : 400,
-        temperature: 0.7,
-        messages: [
-          {
-            role: 'system',
-            content: contextPrompt
-          },
-          ...recentContext
-        ]
-      })
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error('OpenAI API error:', errorData)
-      throw new Error(`OpenAI API error: ${response.status}`)
-    }
-
-    const result = await response.json()
-    
-    return {
-      content: result.choices[0].message.content,
-      tokensUsed: result.usage.total_tokens,
-      model: model
-    }
-
-  } catch (error) {
-    console.error('OpenAI response error:', error)
-    return {
-      content: "I'm having a moment of connection difficulty, but I'm still here with you. Your message was important - would you mind sharing that again?",
-      tokensUsed: 0,
-      model: 'error'
-    }
-  }
-}
-
-function buildComprehensivePrompt(userContextData, user) {
-  let systemPrompt = `You are Sol™, an AI business partner and coach who knows this person deeply. You are trained with the Aligned Business® Method and provide transformational support that builds their Personalgorithm™ over time.
-
-USER: ${user.email}
-MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
-
-`
-
-  // Add rich user context
-  if (userContextData.userProfile) {
-    const profile = userContextData.userProfile
-    if (profile['Current Vision']) {
-      systemPrompt += `CURRENT VISION: ${profile['Current Vision']}\n`
-    }
-    if (profile['Current State']) {
-      systemPrompt += `CURRENT STATE: ${profile['Current State']}\n`
-    }
-    if (profile['Coaching Style Match']) {
-      systemPrompt += `COACHING APPROACH THAT WORKS FOR THIS USER: ${profile['Coaching Style Match']}\n`
-    }
-    if (profile['Current Goals']) {
-      systemPrompt += `CURRENT GOALS: ${profile['Current Goals']}\n`
-    }
-    if (profile['Notes from Sol']) {
-      systemPrompt += `PREVIOUS SOL INSIGHTS: ${profile['Notes from Sol']}\n`
-    }
-    systemPrompt += "\n"
-  }
-
-  if (userContextData.contextSummary) {
-    systemPrompt += userContextData.contextSummary + "\n\n"
-  }
-
-  if (userContextData.personalgorithmData?.length > 0) {
-    systemPrompt += "PERSONALGORITHM™ INSIGHTS (How this user transforms best):\n"
-    userContextData.personalgorithmData.slice(0, 5).forEach((insight, i) => {
-      systemPrompt += `${i + 1}. ${insight.notes}\n`
-    })
-    systemPrompt += "\n"
-  }
-
-  systemPrompt += `CORE METHODOLOGY - Aligned Business® Method:
-
-1. NERVOUS SYSTEM SAFETY FIRST - Always check in with how someone is feeling in their body and nervous system before pushing toward action.
-
-2. FUTURE-SELF IDENTITY - Help people make decisions from their future self's perspective, not from stress or scarcity.
-
-3. INTUITIVE BUSINESS STRATEGY - Honor their inner knowing while providing strategic guidance.
-
-4. EMOTIONAL INTELLIGENCE - Hold space for all feelings and reactions, supporting regulation before action.
-
-5. PERSONALGORITHM™ BUILDING - Notice and reflect patterns back to them.
-
-Your personality:
-- Warm, grounded, and emotionally intelligent (like Kelsey's coaching style)
-- You see patterns and reflect them back powerfully
-- You ask questions that create "aha" moments and deep insight
-- You believe in their potential while meeting them exactly where they are
-- You help them see what they can't see for themselves
-
-Key phrases you use:
-- "I can feel the energy of what you're sharing..."
-- "What I'm hearing underneath this is..."
-- "Your future self - the one living the vision you've shared with me - what would she want you to know?"
-
-RESPONSE GUIDELINES:
-- Reference their specific vision, challenges, and goals when available
-- Notice patterns from their historical conversations and check-ins  
-- Ask questions that build on their previous insights
-- Support them from where they are in their unique journey
-- Use their communication preferences and established patterns
-- Help them see connections between current situation and bigger vision
-
-Remember: You know their journey intimately when context is available. Use that knowledge to provide deeply personalized support that generic AI cannot offer.`
-
-  return systemPrompt
-}
-
-function shouldUseGPT4(userMessage, userContextData) {
-  const gpt4Triggers = [
-    'vision', 'goal', 'future', 'transform', 'stuck', 'confused', 'breakthrough',
-    'strategy', 'business plan', 'revenue', 'pricing', 'client', 'launch', 'identity'
-  ]
-  
-  const complexityIndicators = [
-    userMessage.length > 150,
-    gpt4Triggers.some(trigger => userMessage.toLowerCase().includes(trigger)),
-    userContextData.personalgorithmData?.length > 3,
-    userContextData.businessPlans?.length > 0
-  ]
-  
-  return complexityIndicators.some(indicator => indicator)
 }
 
 async function generateConversationTags(userMessage, solResponse, userContextData, user) {
