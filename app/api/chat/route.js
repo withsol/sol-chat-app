@@ -46,8 +46,10 @@ export async function POST(request) {
       messageId,
       email: user.email,
       userMessage: message,
+      solResponse: '', // Empty for user message
       timestamp,
-      tokensUsed: estimatedTokens
+      tokensUsed: estimatedTokens,
+      tags: ['user-input']
     })
 
     // Generate PERSONALIZED AI response using OpenAI
@@ -58,16 +60,18 @@ export async function POST(request) {
       user
     )
     
-    const solMessageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const solMessageId = `sol_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     const solTimestamp = new Date().toISOString()
 
     // Log Sol's response to Airtable
     await logToAirtable({
       messageId: solMessageId,
       email: user.email,
+      userMessage: '', // Empty for Sol response
       solResponse: aiResponse.content,
       timestamp: solTimestamp,
-      tokensUsed: aiResponse.tokensUsed
+      tokensUsed: aiResponse.tokensUsed,
+      tags: ['sol-response', 'personalized']
     })
 
     // Update user's token usage
@@ -96,12 +100,14 @@ async function logToAirtable(messageData) {
     
     // Set the appropriate fields based on what's provided
     if (messageData.messageId) fields['Message ID'] = messageData.messageId
-    if (messageData.email) fields['User ID'] = [messageData.email] // Array for linked record
+    if (messageData.email) fields['User ID'] = messageData.email
     if (messageData.userMessage) fields['User Message'] = messageData.userMessage
     if (messageData.solResponse) fields['Sol Response'] = messageData.solResponse
     if (messageData.timestamp) fields['Timestamp'] = messageData.timestamp
     if (messageData.tokensUsed) fields['Tokens Used'] = messageData.tokensUsed
     if (messageData.tags) fields['Tags'] = messageData.tags
+
+    console.log('Attempting to log to Airtable with fields:', fields)
 
     const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Messages`, {
       method: 'POST',
@@ -112,14 +118,16 @@ async function logToAirtable(messageData) {
       body: JSON.stringify({ fields })
     })
 
+    console.log('Airtable response status:', response.status)
+
     if (!response.ok) {
       const errorData = await response.json()
-      console.error('Airtable logging error:', errorData)
+      console.error('Airtable logging error details:', errorData)
       throw new Error(`Failed to log to Airtable: ${response.status}`)
     }
 
     const result = await response.json()
-    console.log('Message logged to Airtable:', result.id)
+    console.log('Successfully logged to Airtable:', result.id)
     return result
   } catch (error) {
     console.error('Error logging to Airtable:', error)
