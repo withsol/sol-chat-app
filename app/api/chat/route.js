@@ -266,3 +266,208 @@ function estimateTokenCount(message, history) {
   const historyTokens = history.slice(-8).reduce((sum, msg) => sum + Math.ceil(msg.content.length / 4), 0)
   return messageTokens + historyTokens + 1000 // Add overhead for system prompt
 }
+
+async function generateConversationTags(userMessage, solResponse, userContextData, user) {
+  try {
+    // Build context about the user for more intelligent tagging
+    let contextForTagging = `User: ${user.email}\n`
+    
+    if (userContextData.userProfile) {
+      const profile = userContextData.userProfile
+      if (profile['Current Vision']) contextForTagging += `Vision: ${profile['Current Vision']}\n`
+      if (profile['Current State']) contextForTagging += `Current State: ${profile['Current State']}\n`
+      if (profile['Current Goals']) contextForTagging += `Goals: ${profile['Current Goals']}\n`
+      if (profile['Tags']) contextForTagging += `Previous User Tags: ${profile['Tags']}\n`
+    }
+
+    const tagPrompt = `You are Sol™, analyzing this coaching conversation to generate intelligent tags for building this user's Personalgorithm™.
+
+USER CONTEXT:
+${contextForTagging}
+
+CONVERSATION:
+User: "${userMessage}"
+Sol: "${solResponse}"
+
+Generate 2-5 tags that capture:
+1. SUPPORT TYPE: What kind of coaching happened? (emotional-support, strategic-planning, breakthrough-moment, nervous-system-regulation, identity-work, visioning, decision-making, etc.)
+
+2. BUSINESS FOCUS: What business area was discussed? (marketing, sales, offers, pricing, client-work, launch-planning, content-creation, social-media, revenue, scaling, etc.)
+
+3. USER STATE: What energy/emotional state was the user in? (overwhelmed, stuck, expanding, confident, anxious, clarity-seeking, transformation, breakthrough, processing, etc.)
+
+4. PERSONALGORITHM™ INSIGHTS: Any patterns about how this user transforms? (needs-movement-first, processes-through-writing, fear-of-visibility, perfectionism, people-pleasing, high-achiever, intuitive-decision-maker, etc.)
+
+5. TOPICS/THEMES: Specific themes discussed (morning-routine, family-balance, imposter-syndrome, pricing-psychology, target-audience, brand-positioning, etc.)
+
+Return ONLY a comma-separated list of 2-5 lowercase tags with hyphens instead of spaces.
+Focus on tags that will help Sol recognize patterns and provide increasingly personalized support.
+
+Tags:`
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        max_tokens: 150,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: tagPrompt }]
+      })
+    })
+
+    if (response.ok) {
+      const result = await response.json()
+      const tagsString = result.choices[0].message.content.trim()
+      const tagsArray = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+      console.log('Sol generated tags:', tagsArray)
+      return tagsArray
+    }
+    
+    return ['general-support'] // Fallback tag
+  } catch (error) {
+    console.error('Error generating conversation tags:', error)
+    return ['general-support'] // Fallback tag
+  }
+}
+
+async function analyzeFlagging(userMessage, solResponse, userContextData, user) {
+  try {
+    const flagPrompt = `Analyze this coaching conversation and determine:
+1. Should this be flagged for human oversight?
+2. Should this be added to the prompt response library for training?
+
+Flag for oversight if:
+- Safety/legal concerns
+- User showing harmful patterns
+- Difficult coaching situation needing human insight
+- Sol's response may have missed something important
+
+Add to library if:
+- Breakthrough moment occurred
+- Excellent coaching response that could be model for future
+- Transformation insight worth preserving
+- Novel approach that worked well
+
+USER: "${userMessage}"
+SOL: "${solResponse}"
+
+Respond in this exact format:
+SHOULD_FLAG: true/false
+REASON: [brief reason if flagged, "none" if not flagged]
+ADD_TO_LIBRARY: true/false`
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        max_tokens: 150,
+        temperature: 0.1,
+        messages: [{ role: 'user', content: flagPrompt }]
+      })
+    })
+
+    if (response.ok) {
+      const result = await response.json()
+      const analysis = result.choices[0].message.content
+      
+      const shouldFlag = analysis.includes('SHOULD_FLAG: true')
+      const addToLibrary = analysis.includes('ADD_TO_LIBRARY: true')
+      
+      // Extract reason
+      const reasonMatch = analysis.match(/REASON: (.+)/i)
+      const reason = reasonMatch ? reasonMatch[1].trim() : 'none'
+      
+      return {
+        shouldFlag,
+        reason: shouldFlag ? reason : '',
+        addToLibrary
+      }
+    }
+    
+    return { shouldFlag: false, reason: '', addToLibrary: false }
+  } catch (error) {
+    console.error('Error analyzing flagging:', error)
+    return { shouldFlag: false, reason: '', addToLibrary: false }
+  }
+}
+
+async function updateUserProfile(email, updates) {
+  try {
+    // First, find the user record
+    const findResponse = await fetch(
+      `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${email}"`,
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`
+        }
+      }
+    )
+
+    if (!findResponse.ok) {
+      console.log('Could not find user for profile update')
+      return null
+    }
+
+    const findData = await findResponse.json()
+    
+    if (findData.records.length === 0) {
+      console.log('User not found for profile update, creating basic user record')
+      // Create basic user record
+      const createResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fields: {
+            'User ID': email,
+            'Date Joined': new Date().toISOString(),
+            'Membership Plan': 'Beta Access',
+            ...updates
+          }
+        })
+      })
+      
+      if (createResponse.ok) {
+        const result = await createResponse.json()
+        console.log('Created user profile:', result.id)
+        return result
+      }
+      return null
+    }
+
+    // Update existing user
+    const recordId = findData.records[0].id
+    const updateResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users/${recordId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: updates
+      })
+    })
+
+    if (!updateResponse.ok) {
+      console.log('Failed to update user profile, but continuing...')
+      return null
+    }
+
+    const result = await updateResponse.json()
+    console.log('User profile updated:', result.id)
+    return result
+  } catch (error) {
+    console.error('Error updating user profile:', error)
+    return null
+  }
+}
