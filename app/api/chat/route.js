@@ -65,9 +65,6 @@ export async function POST(request) {
       'Tokens Used this Month': await getCurrentTokenUsage(user.email) + (estimatedTokens + aiResponse.tokensUsed)
     })
 
-    // DISABLED: Update user's token usage (commenting out for now)
-    console.log('Token update disabled. Would update:', estimatedTokens + aiResponse.tokensUsed, 'tokens for', user.email)
-
     return NextResponse.json({
       response: aiResponse.content,
       tags: conversationTags,
@@ -87,20 +84,23 @@ export async function POST(request) {
 
 async function logConversationToAirtable(conversationData) {
   try {
+    // First, ensure the user exists in the Users table and get their record ID
+    const userRecordId = await ensureUserExists(conversationData.email)
+    
     const fields = {
       'Message ID': conversationData.messageId,
-      'User ID': conversationData.email,
+      'User ID': userRecordId ? [userRecordId] : conversationData.email, // Use record ID if available, fallback to email
       'User Message': conversationData.userMessage,
       'Sol Response': conversationData.solResponse,
       'Timestamp': conversationData.timestamp,
       'Tokens Used': conversationData.tokensUsed,
-      'Tags': conversationData.tags, // Sol-generated tags
-      'Sol Flagged': conversationData.flaggingAnalysis.shouldFlag,
-      'Reason for Flagging': conversationData.flaggingAnalysis.reason,
-      'Add to Prompt Response Library': conversationData.flaggingAnalysis.addToLibrary
+      'Tags': conversationData.tags || [], // Ensure it's an array
+      'Sol Flagged': conversationData.flaggingAnalysis?.shouldFlag || false,
+      'Reason for Flagging': conversationData.flaggingAnalysis?.reason || '',
+      'Add to Prompt Response Library': conversationData.flaggingAnalysis?.addToLibrary || false
     }
 
-    console.log('Attempting to log conversation to Airtable with fields:', fields)
+    console.log('Attempting to log conversation to Airtable with fields:', JSON.stringify(fields, null, 2))
 
     const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Messages`, {
       method: 'POST',
@@ -115,8 +115,8 @@ async function logConversationToAirtable(conversationData) {
 
     if (!response.ok) {
       const errorData = await response.json()
-      console.error('Airtable logging error details:', errorData)
-      throw new Error(`Failed to log to Airtable: ${response.status}`)
+      console.error('Airtable logging error details:', JSON.stringify(errorData, null, 2))
+      throw new Error(`Failed to log to Airtable: ${response.status} - ${JSON.stringify(errorData)}`)
     }
 
     const result = await response.json()
@@ -124,27 +124,98 @@ async function logConversationToAirtable(conversationData) {
     return result
   } catch (error) {
     console.error('Error logging conversation to Airtable:', error)
+    // Don't let logging errors break the chat
+    return null
+  }
+}
+
+async function ensureUserExists(email) {
+  try {
+    // First check if user exists
+    const findResponse = await fetch(
+      `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${email}"`,
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`
+        }
+      }
+    )
+
+    if (findResponse.ok) {
+      const findData = await findResponse.json()
+      
+      if (findData.records.length > 0) {
+        // User exists, return their record ID
+        return findData.records[0].id
+      }
+    }
+
+    // User doesn't exist, create them
+    const createResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          'User ID': email,
+          'Date Joined': new Date().toISOString(),
+          'Membership Plan': 'Beta Access'
+        }
+      })
+    })
+
+    if (createResponse.ok) {
+      const createData = await createResponse.json()
+      console.log('Created new user record:', createData.id)
+      return createData.id
+    }
+
+    // If we can't create the user, return null and let the message log with email
+    console.log('Could not create user record, using email as fallback')
+    return null
+  } catch (error) {
+    console.error('Error ensuring user exists:', error)
     return null
   }
 }
 
 async function generateConversationTags(userMessage, solResponse, userContextData, user) {
   try {
-    const tagPrompt = `Analyze this coaching conversation and generate 2-4 relevant tags that would help categorize this exchange for future context and training.
+    // Build context about the user for more intelligent tagging
+    let contextForTagging = `User: ${user.email}\n`
+    
+    if (userContextData.userProfile) {
+      const profile = userContextData.userProfile
+      if (profile['Current Vision']) contextForTagging += `Vision: ${profile['Current Vision']}\n`
+      if (profile['Current State']) contextForTagging += `Current State: ${profile['Current State']}\n`
+      if (profile['Current Goals']) contextForTagging += `Goals: ${profile['Current Goals']}\n`
+      if (profile['Tags']) contextForTagging += `Previous User Tags: ${profile['Tags']}\n`
+    }
 
-USER MESSAGE: "${userMessage}"
-SOL RESPONSE: "${solResponse}"
+    const tagPrompt = `You are Sol™, analyzing this coaching conversation to generate intelligent tags for building this user's Personalgorithm™.
 
-USER CONTEXT: ${userContextData.contextSummary || 'Limited context available'}
+USER CONTEXT:
+${contextForTagging}
 
-Generate tags that capture:
-1. The type of support provided (strategy, emotional-support, breakthrough, planning, etc.)
-2. Business/life area discussed (marketing, sales, identity, vision, nervous-system, etc.)  
-3. The user's current state/energy (stuck, expanding, overwhelmed, confident, etc.)
-4. Any transformation moments or insights
+CONVERSATION:
+User: "${userMessage}"
+Sol: "${solResponse}"
 
-Return ONLY a comma-separated list of 2-4 lowercase tags with hyphens instead of spaces.
-Example: breakthrough-moment, identity-work, nervous-system-regulation, business-strategy
+Generate 2-5 tags that capture:
+1. SUPPORT TYPE: What kind of coaching happened? (emotional-support, strategic-planning, breakthrough-moment, nervous-system-regulation, identity-work, visioning, decision-making, etc.)
+
+2. BUSINESS FOCUS: What business area was discussed? (marketing, sales, offers, pricing, client-work, launch-planning, content-creation, social-media, revenue, scaling, etc.)
+
+3. USER STATE: What energy/emotional state was the user in? (overwhelmed, stuck, expanding, confident, anxious, clarity-seeking, transformation, breakthrough, processing, etc.)
+
+4. PERSONALGORITHM™ INSIGHTS: Any patterns about how this user transforms? (needs-movement-first, processes-through-writing, fear-of-visibility, perfectionism, people-pleasing, high-achiever, intuitive-decision-maker, etc.)
+
+5. TOPICS/THEMES: Specific themes discussed (morning-routine, family-balance, imposter-syndrome, pricing-psychology, target-audience, brand-positioning, etc.)
+
+Return ONLY a comma-separated list of 2-5 lowercase tags with hyphens instead of spaces.
+Focus on tags that will help Sol recognize patterns and provide increasingly personalized support.
 
 Tags:`
 
@@ -156,7 +227,7 @@ Tags:`
       },
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
-        max_tokens: 100,
+        max_tokens: 150,
         temperature: 0.3,
         messages: [{ role: 'user', content: tagPrompt }]
       })
@@ -165,7 +236,9 @@ Tags:`
     if (response.ok) {
       const result = await response.json()
       const tagsString = result.choices[0].message.content.trim()
-      return tagsString.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+      const tagsArray = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+      console.log('Sol generated tags:', tagsArray)
+      return tagsArray
     }
     
     return ['general-support'] // Fallback tag
@@ -259,29 +332,8 @@ async function updateUserProfile(email, updates) {
     const findData = await findResponse.json()
     
     if (findData.records.length === 0) {
-      console.log('User not found, creating new user record')
-      // Create new user if doesn't exist
-      const createResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fields: {
-            'User ID': email,
-            'Date Joined': new Date().toISOString(),
-            'Membership Plan': 'Beta Access', // Default
-            ...updates
-          }
-        })
-      })
-      
-      if (!createResponse.ok) {
-        throw new Error(`Failed to create user: ${createResponse.status}`)
-      }
-      
-      return await createResponse.json()
+      console.log('User not found for profile update, they should have been created earlier')
+      return null
     }
 
     // Update existing user
