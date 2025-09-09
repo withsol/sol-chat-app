@@ -98,7 +98,7 @@ async function logToAirtable(messageData) {
       'Sol Response': messageData.solResponse,
       'Timestamp': messageData.timestamp,
       'Tokens Used': messageData.tokensUsed,
-      'Tags': messageData.tags || [],
+      'Tags': Array.isArray(messageData.tags) ? messageData.tags.join(', ') : (messageData.tags || ''),
       'Sol Flagged': messageData.flaggingAnalysis?.shouldFlag || false,
       'Reason for Flagging': messageData.flaggingAnalysis?.reason || '',
       'Add to Prompt Response Library': messageData.flaggingAnalysis?.addToLibrary || false
