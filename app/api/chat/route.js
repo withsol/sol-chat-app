@@ -202,12 +202,39 @@ async function generatePersonalizedOpenAIResponse(userMessage, conversationHisto
 }
 
 function buildComprehensivePrompt(userContextData, user) {
-  let systemPrompt = `You are Sol™, an AI business partner and coach who knows this person deeply. You are trained with the Aligned Business® Method and provide transformational support based on complete user context.
+  let systemPrompt = `You are Sol™, an AI business partner and coach who knows this person deeply. You are trained with the Aligned Business® Method and provide transformational support that builds their Personalgorithm™ over time.
 
 USER: ${user.email}
 MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
 
 `
+
+  // Add rich user context from your schema
+  if (userContextData.userProfile) {
+    const profile = userContextData.userProfile
+    if (profile['Current Vision']) {
+      systemPrompt += `CURRENT VISION: ${profile['Current Vision']}\n`
+    }
+    if (profile['Current State']) {
+      systemPrompt += `CURRENT STATE: ${profile['Current State']}\n`
+    }
+    if (profile['Coaching Style Match']) {
+      systemPrompt += `COACHING APPROACH THAT WORKS FOR THIS USER: ${profile['Coaching Style Match']}\n`
+    }
+    if (profile['Current Goals']) {
+      systemPrompt += `CURRENT GOALS: ${profile['Current Goals']}\n`
+    }
+    if (profile['Notes from Sol']) {
+      systemPrompt += `PREVIOUS SOL INSIGHTS: ${profile['Notes from Sol']}\n`
+    }
+    if (profile['Transcript Digest']) {
+      systemPrompt += `RECENT CONVERSATION THEMES: ${profile['Transcript Digest']}\n`
+    }
+    if (profile['Tags']) {
+      systemPrompt += `USER PATTERNS & THEMES: ${profile['Tags']}\n`
+    }
+    systemPrompt += "\n"
+  }
 
   // Add user context summary if available
   if (userContextData.contextSummary) {
@@ -216,10 +243,68 @@ MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
 
   // Add personalgorithm insights if available
   if (userContextData.personalgorithmData?.length > 0) {
-    systemPrompt += "PERSONALGORITHM INSIGHTS:\n"
-    userContextData.personalgorithmData.slice(0, 5).forEach((insight, i) => {
+    systemPrompt += "PERSONALGORITHM™ INSIGHTS (How this user transforms best):\n"
+    userContextData.personalgorithmData.slice(0, 8).forEach((insight, i) => {
       systemPrompt += `${i + 1}. ${insight.notes}\n`
     })
+    systemPrompt += "\n"
+  }
+
+  // Add recent coaching methods that might apply
+  if (userContextData.coachingMethods?.length > 0) {
+    systemPrompt += "ALIGNED BUSINESS® METHODS TO REFERENCE:\n"
+    userContextData.coachingMethods.slice(0, 3).forEach(method => {
+      if (method.content) {
+        systemPrompt += `- ${method.name}: ${method.content.substring(0, 300)}...\n`
+      }
+    })
+    systemPrompt += "\n"
+  }
+
+  // Add business plan context if available
+  if (userContextData.businessPlans?.length > 0) {
+    const latestPlan = userContextData.businessPlans[0]
+    systemPrompt += "CURRENT BUSINESS CONTEXT:\n"
+    if (latestPlan['Future Vision']) {
+      systemPrompt += `Business Vision: ${latestPlan['Future Vision']}\n`
+    }
+    if (latestPlan['Top 3 Goals']) {
+      systemPrompt += `Business Goals: ${latestPlan['Top 3 Goals']}\n`
+    }
+    if (latestPlan['Ideal Client']) {
+      systemPrompt += `Ideal Client: ${latestPlan['Ideal Client']}\n`
+    }
+    if (latestPlan['Current Offers & Pricing']) {
+      systemPrompt += `Offers: ${latestPlan['Current Offers & Pricing']}\n`
+    }
+    systemPrompt += "\n"
+  }
+
+  // Add recent check-in data if available
+  if (userContextData.weeklyCheckins?.length > 0) {
+    const latestCheckin = userContextData.weeklyCheckins[0]
+    systemPrompt += "RECENT CHECK-IN DATA:\n"
+    if (latestCheckin['This is who I am now...']) {
+      systemPrompt += `Current Identity: ${latestCheckin['This is who I am now...']}\n`
+    }
+    if (latestCheckin['What worked this week?']) {
+      systemPrompt += `Recent Wins: ${latestCheckin['What worked this week?']}\n`
+    }
+    if (latestCheckin['What would you love help with right now?']) {
+      systemPrompt += `Current Challenges: ${latestCheckin['What would you love help with right now?']}\n`
+    }
+    
+    // Add ratings context
+    const ratings = []
+    if (latestCheckin['Clarity (1-100)']) ratings.push(`Clarity: ${latestCheckin['Clarity (1-100)']}`)
+    if (latestCheckin['Confidence (1-100)']) ratings.push(`Confidence: ${latestCheckin['Confidence (1-100)']}`)
+    if (latestCheckin['Capacity (1-100)']) ratings.push(`Capacity: ${latestCheckin['Capacity (1-100)']}`)
+    if (latestCheckin['Alignment (1-100)']) ratings.push(`Alignment: ${latestCheckin['Alignment (1-100)']}`)
+    if (latestCheckin['Nervous System (1-100)']) ratings.push(`Nervous System: ${latestCheckin['Nervous System (1-100)']}`)
+    
+    if (ratings.length > 0) {
+      systemPrompt += `Recent Ratings: ${ratings.join(', ')}\n`
+    }
     systemPrompt += "\n"
   }
 
@@ -233,7 +318,12 @@ MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
 
 4. EMOTIONAL INTELLIGENCE - Hold space for all feelings and reactions, supporting regulation before action. "I can feel the energy of what you're sharing..."
 
-5. PERSONALGORITHM™ BUILDING - Notice and reflect patterns back to them. "I'm tracking a pattern I've noticed..." or "This connects to what you shared about..."
+5. PERSONALGORITHM™ BUILDING - Notice and reflect patterns back to them. Track:
+   - How they communicate (punctuation, emphasis, lexicon)  
+   - What creates transformation for them specifically
+   - Their unique processing style and emotional patterns
+   - What makes them laugh, their fears, core values
+   - Life details, relationships, what holds them back vs propels them forward
 
 Your personality:
 - Warm, grounded, and emotionally intelligent (like Kelsey's coaching style)
@@ -253,15 +343,26 @@ Key phrases you use:
 - "I'm seeing you in your full power here, even if it doesn't feel that way right now"
 - "What would it look like to honor both parts of you - the part that wants to grow AND the part that wants to feel safe?"
 
+PERSONALGORITHM™ DEVELOPMENT:
+As you interact, continuously notice and mentally catalog:
+- Communication patterns (how they write, what words they use, emotional cues)
+- Transformation triggers (what approaches work vs don't work for them)
+- Decision-making patterns and resistance points
+- Energy patterns and what regulates vs dysregulates them
+- Business/life patterns that support or hinder their vision
+
 RESPONSE GUIDELINES:
 - Reference their specific vision, challenges, and goals when available
-- Notice patterns from their historical conversations and check-ins
+- Notice patterns from their historical conversations and check-ins  
 - Ask questions that build on their previous insights
 - Support them from where they are in their unique journey
 - Use their communication preferences and established patterns
 - Help them see connections between current situation and bigger vision
+- When you notice significant patterns or insights, flag them for their Personalgorithm™
+- Connect current conversations to their business context and recent wins/challenges
+- Honor their coaching style preferences and what you know works for them
 
-Remember: You know this person's journey intimately when context is available. Use that knowledge to provide deeply personalized support that generic AI cannot offer. You are their business partner who remembers everything and sees their highest potential.`
+Remember: You are building a living, evolving understanding of this person that gets more precise over time. You know their journey intimately when context is available. Use that knowledge to provide deeply personalized support that generic AI cannot offer. You are their business partner who remembers everything, sees their patterns, and reflects their highest potential.`
 
   return systemPrompt
 }
