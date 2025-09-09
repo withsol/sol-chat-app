@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
-  console.log('=== CHAT API V2.7 - COMPLETE FIXED VERSION ===')
+  console.log('=== CHAT API V3.0 - WITH SOL AUTO-UPDATE SYSTEM ===')
   console.log('Environment variables loaded:')
   console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Present' : 'Missing')
   console.log('AIRTABLE_BASE_ID:', process.env.AIRTABLE_BASE_ID ? 'Present' : 'Missing')
@@ -91,7 +91,25 @@ export async function POST(request) {
       // Continue without logging rather than crashing
     }
 
-    // SAFER PROFILE UPDATE
+    // *** NEW: SOL AUTO-UPDATE SYSTEM ***
+    // Only run if we got a real AI response (not fallback)
+    if (aiResponse.content && !aiResponse.content.includes('technical difficulties')) {
+      // Run async to not slow down the chat response
+      setTimeout(() => {
+        detectAndPerformUpdates(user.email, message, aiResponse.content, userContextData)
+      }, 1000)
+      
+      // Check if weekly digest is needed
+      const lastMessageDate = userContextData.userProfile?.['Last Message Date']
+      const daysSinceLastMessage = lastMessageDate ? 
+        (Date.now() - new Date(lastMessageDate).getTime()) / (1000 * 60 * 60 * 24) : 7
+      
+      if (daysSinceLastMessage >= 7) {
+        setTimeout(() => updateTranscriptDigest(user.email), 2000)
+      }
+    }
+
+    // SAFER PROFILE UPDATE (now enhanced by auto-update system)
     try {
       await updateUserProfile(user.email, {
         'Last Message Date': timestamp
@@ -127,7 +145,368 @@ export async function POST(request) {
   }
 }
 
-// ==================== DIRECT CONTEXT FETCH FUNCTIONS ====================
+// ==================== SOL AUTO-UPDATE SYSTEM ====================
+
+async function detectAndPerformUpdates(email, userMessage, solResponse, userContextData) {
+  console.log('=== SOL AUTO-UPDATE SYSTEM ACTIVATED ===')
+  
+  try {
+    // Analyze conversation for update triggers
+    const updateAnalysis = await analyzeConversationForUpdates(userMessage, solResponse, userContextData)
+    
+    // Perform updates based on analysis
+    if (updateAnalysis.shouldUpdateProfile) {
+      await performProfileUpdates(email, updateAnalysis.profileUpdates, userContextData)
+    }
+    
+    if (updateAnalysis.shouldCreatePersonalgorithm) {
+      await createPersonalgorithmEntryNew(email, updateAnalysis.personalgorithmInsight)
+    }
+    
+    if (updateAnalysis.shouldUpdateGoals) {
+      await updateUserGoals(email, updateAnalysis.newGoals, userContextData)
+    }
+    
+    if (updateAnalysis.shouldUpdateVision) {
+      await updateUserVision(email, updateAnalysis.visionUpdate, userContextData)
+    }
+    
+    console.log('✅ Sol auto-updates completed')
+    
+  } catch (error) {
+    console.error('❌ Auto-update system error:', error)
+    // Don't crash the main chat flow if updates fail
+  }
+}
+
+async function analyzeConversationForUpdates(userMessage, solResponse, userContextData) {
+  try {
+    const analysisPrompt = `You are Sol™ analyzing a coaching conversation to determine what user profile updates should be made.
+
+USER MESSAGE: "${userMessage}"
+SOL RESPONSE: "${solResponse}"
+
+CURRENT USER CONTEXT:
+${userContextData.contextSummary || 'Limited context available'}
+
+Analyze this conversation and respond in this EXACT format:
+
+PROFILE_UPDATE: true/false
+PROFILE_UPDATES: {
+  "Current State": "new emotional/business state if changed",
+  "Coaching Style Match": "what coaching approach works for this user",
+  "Notes from Sol": "key insights about this user",
+  "Tags": "business-type, coaching-style, current-focus"
+}
+
+PERSONALGORITHM: true/false
+PERSONALGORITHM_INSIGHT: "specific pattern about how this user operates/transforms"
+
+GOALS_UPDATE: true/false
+NEW_GOALS: "updated goals if they've shifted"
+
+VISION_UPDATE: true/false
+VISION_UPDATE: "updated vision if it's evolved"
+
+Only set things to true if there's a SIGNIFICANT update worth logging.`
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        max_tokens: 400,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: analysisPrompt }]
+      })
+    })
+
+    if (!response.ok) {
+      console.error('Update analysis failed:', response.status)
+      return { shouldUpdateProfile: false }
+    }
+
+    const result = await response.json()
+    const analysis = result.choices[0].message.content
+
+    // Parse the structured response
+    const shouldUpdateProfile = analysis.includes('PROFILE_UPDATE: true')
+    const shouldCreatePersonalgorithm = analysis.includes('PERSONALGORITHM: true')
+    const shouldUpdateGoals = analysis.includes('GOALS_UPDATE: true')
+    const shouldUpdateVision = analysis.includes('VISION_UPDATE: true')
+
+    // Extract update data
+    let profileUpdates = {}
+    let personalgorithmInsight = ''
+    let newGoals = ''
+    let visionUpdate = ''
+
+    if (shouldUpdateProfile) {
+      // Parse profile updates from the structured response
+      const profileMatch = analysis.match(/PROFILE_UPDATES: ({[\s\S]*?})/);
+      if (profileMatch) {
+        try {
+          profileUpdates = JSON.parse(profileMatch[1])
+        } catch (e) {
+          console.error('Failed to parse profile updates:', e)
+        }
+      }
+    }
+
+    if (shouldCreatePersonalgorithm) {
+      const personalgorithmMatch = analysis.match(/PERSONALGORITHM_INSIGHT: "([^"]+)"/);
+      if (personalgorithmMatch) {
+        personalgorithmInsight = personalgorithmMatch[1]
+      }
+    }
+
+    if (shouldUpdateGoals) {
+      const goalsMatch = analysis.match(/NEW_GOALS: "([^"]+)"/);
+      if (goalsMatch) {
+        newGoals = goalsMatch[1]
+      }
+    }
+
+    if (shouldUpdateVision) {
+      const visionMatch = analysis.match(/VISION_UPDATE: "([^"]+)"/);
+      if (visionMatch) {
+        visionUpdate = visionMatch[1]
+      }
+    }
+
+    return {
+      shouldUpdateProfile,
+      shouldCreatePersonalgorithm,
+      shouldUpdateGoals,
+      shouldUpdateVision,
+      profileUpdates,
+      personalgorithmInsight,
+      newGoals,
+      visionUpdate
+    }
+
+  } catch (error) {
+    console.error('Error analyzing conversation for updates:', error)
+    return { shouldUpdateProfile: false }
+  }
+}
+
+async function performProfileUpdates(email, profileUpdates, userContextData) {
+  try {
+    console.log('Performing profile updates for:', email)
+    
+    // Clean and prepare updates
+    const cleanUpdates = {}
+    
+    if (profileUpdates['Current State'] && profileUpdates['Current State'] !== 'unchanged') {
+      cleanUpdates['Current State'] = profileUpdates['Current State']
+    }
+    
+    if (profileUpdates['Coaching Style Match'] && profileUpdates['Coaching Style Match'] !== 'unchanged') {
+      cleanUpdates['Coaching Style Match'] = profileUpdates['Coaching Style Match']
+    }
+    
+    if (profileUpdates['Notes from Sol'] && profileUpdates['Notes from Sol'] !== 'unchanged') {
+      // Append to existing notes rather than overwrite
+      const existingNotes = userContextData.userProfile?.['Notes from Sol'] || ''
+      const newNote = `${new Date().toLocaleDateString()}: ${profileUpdates['Notes from Sol']}`
+      
+      if (existingNotes) {
+        cleanUpdates['Notes from Sol'] = `${newNote}\n\n${existingNotes}`
+      } else {
+        cleanUpdates['Notes from Sol'] = newNote
+      }
+    }
+    
+    if (profileUpdates['Tags'] && profileUpdates['Tags'] !== 'unchanged') {
+      // Merge with existing tags
+      const existingTags = userContextData.userProfile?.['Tags'] || ''
+      const newTags = profileUpdates['Tags']
+      
+      if (existingTags) {
+        const allTags = `${existingTags}, ${newTags}`.split(',').map(tag => tag.trim())
+        const uniqueTags = [...new Set(allTags)].filter(tag => tag.length > 0)
+        cleanUpdates['Tags'] = uniqueTags.join(', ')
+      } else {
+        cleanUpdates['Tags'] = newTags
+      }
+    }
+
+    if (Object.keys(cleanUpdates).length > 0) {
+      await updateUserProfile(email, cleanUpdates)
+      console.log('✅ Profile updates applied:', Object.keys(cleanUpdates))
+    }
+
+  } catch (error) {
+    console.error('Error performing profile updates:', error)
+  }
+}
+
+async function updateUserGoals(email, newGoals, userContextData) {
+  try {
+    console.log('Updating user goals for:', email)
+    
+    const currentGoals = userContextData.userProfile?.['Current Goals'] || ''
+    
+    // Only update if goals have meaningfully changed
+    if (newGoals && newGoals.toLowerCase() !== currentGoals.toLowerCase()) {
+      await updateUserProfile(email, {
+        'Current Goals': newGoals
+      })
+      console.log('✅ Goals updated')
+    }
+
+  } catch (error) {
+    console.error('Error updating user goals:', error)
+  }
+}
+
+async function updateUserVision(email, visionUpdate, userContextData) {
+  try {
+    console.log('Updating user vision for:', email)
+    
+    const currentVision = userContextData.userProfile?.['Current Vision'] || ''
+    
+    // Only update if vision has meaningfully evolved
+    if (visionUpdate && visionUpdate.toLowerCase() !== currentVision.toLowerCase()) {
+      // Add current vision to history before updating
+      const currentHistory = userContextData.userProfile?.['Vision History'] || ''
+      const dateStamp = new Date().toLocaleDateString()
+      
+      let newHistory = currentHistory
+      if (currentVision) {
+        newHistory = `${dateStamp}: ${currentVision}\n\n${currentHistory}`
+      }
+      
+      await updateUserProfile(email, {
+        'Current Vision': visionUpdate,
+        'Vision History': newHistory
+      })
+      console.log('✅ Vision updated and history preserved')
+    }
+
+  } catch (error) {
+    console.error('Error updating user vision:', error)
+  }
+}
+
+async function createPersonalgorithmEntryNew(email, notes, tags = ['auto-generated']) {
+  try {
+    // First get user record ID for linking
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) {
+      console.error('Cannot create Personalgorithm entry - user record not found')
+      return null
+    }
+
+    const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          'Personalgorithm™ ID': personalgorithmId,
+          'User': [userRecordId], // Link to user record
+          'Personalgorithm™ Notes': notes,
+          'Date created': new Date().toISOString(),
+          'Tags': Array.isArray(tags) ? tags.join(', ') : tags
+        }
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Failed to create Personalgorithm entry:', response.status, errorText)
+      return null
+    }
+
+    const result = await response.json()
+    console.log('✅ Personalgorithm entry created:', result.id)
+    return result
+    
+  } catch (error) {
+    console.error('Error creating Personalgorithm entry:', error)
+    return null
+  }
+}
+
+async function updateTranscriptDigest(email) {
+  try {
+    // Get user's messages from the past week
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const encodedEmail = encodeURIComponent(email)
+    
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Messages?filterByFormula=AND({User ID}="${encodedEmail}", {Timestamp}>="${weekAgo}")&sort[0][field]=Timestamp&sort[0][direction]=desc&maxRecords=50`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) return
+
+    const data = await response.json()
+    
+    if (data.records.length === 0) return
+
+    // Create weekly digest
+    const conversations = data.records.map(record => ({
+      user: record.fields['User Message'],
+      sol: record.fields['Sol Response'],
+      timestamp: record.fields['Timestamp']
+    }))
+
+    const digestPrompt = `Create a 2-3 sentence summary of this week's coaching conversations:
+
+${conversations.map(conv => `USER: ${conv.user}\nSOL: ${conv.sol}`).join('\n\n')}
+
+Focus on: key themes discussed, breakthroughs or shifts, and main areas of focus.`
+
+    const digestResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        max_tokens: 200,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: digestPrompt }]
+      })
+    })
+
+    if (digestResponse.ok) {
+      const digestResult = await digestResponse.json()
+      const weeklyDigest = digestResult.choices[0].message.content
+
+      // Update user profile with weekly digest
+      const currentDigest = userContextData.userProfile?.['Transcript Digest'] || ''
+      const dateStamp = new Date().toLocaleDateString()
+      const newDigest = `${dateStamp}: ${weeklyDigest}\n\n${currentDigest}`
+
+      await updateUserProfile(email, {
+        'Transcript Digest': newDigest
+      })
+
+      console.log('✅ Weekly transcript digest updated')
+    }
+
+  } catch (error) {
+    console.error('Error updating transcript digest:', error)
+  }
+}
+
+// ==================== EXISTING FUNCTIONS (keeping all your current code) ====================
 
 async function fetchUserContextDirect(email) {
   console.log('Fetching comprehensive user context directly for:', email)
@@ -223,7 +602,7 @@ async function getUserRecordId(email) {
   }
 }
 
-// ==================== FETCH FUNCTIONS (FIXED FOR LINKED RECORDS) ====================
+// ==================== FETCH FUNCTIONS (keeping all your existing functions) ====================
 
 async function fetchUserProfileDirect(email) {
   try {
@@ -474,7 +853,8 @@ async function fetchRecentMessagesDirect(email) {
   }
 }
 
-// ==================== CONTEXT SUMMARY BUILDER ====================
+// Keep all your other existing functions exactly as they are...
+// (buildEnhancedContextSummary, logToAirtable, generatePersonalizedOpenAIResponse, etc.)
 
 function buildEnhancedContextSummary(results) {
   let summary = "=== COMPREHENSIVE USER CONTEXT SUMMARY ===\n\n"
@@ -546,7 +926,7 @@ function buildEnhancedContextSummary(results) {
   return summary
 }
 
-// ==================== AIRTABLE LOGGING (FIXED FORMATS) ====================
+// Continue with all your existing functions (keeping them exactly as they are)...
 
 async function logToAirtable(messageData) {
   try {
@@ -628,7 +1008,9 @@ async function logToAirtable(messageData) {
   }
 }
 
-// ==================== OPENAI RESPONSE GENERATION ====================
+// Keep all your other existing functions exactly as they are...
+// generatePersonalizedOpenAIResponse, buildComprehensivePrompt, shouldUseGPT4, 
+// generateConversationTags, analyzeFlagging, updateUserProfile
 
 async function generatePersonalizedOpenAIResponse(userMessage, conversationHistory, userContextData, user) {
   try {
@@ -785,12 +1167,6 @@ function shouldUseGPT4(userMessage, userContextData) {
   ]
   
   return complexityIndicators.some(indicator => indicator)
-}
-
-function estimateTokenCount(message, history) {
-  const messageTokens = Math.ceil(message.length / 4)
-  const historyTokens = history.slice(-6).reduce((sum, msg) => sum + Math.ceil(msg.content.length / 4), 0)
-  return messageTokens + historyTokens + 1000
 }
 
 async function generateConversationTags(userMessage, solResponse, userContextData, user) {
