@@ -13,7 +13,15 @@ export async function POST(request) {
     console.log('Chat request for user:', user.email)
 
     // FETCH USER'S COMPLETE CONTEXT BEFORE RESPONDING
-    const contextResponse = await fetch(`${process.env.NEXTAUTH_URL || 'https://sol-chat-app.vercel.app'}/api/user-context`, {
+    const baseUrl = process.env.VERCEL_URL 
+  ? `https://${process.env.VERCEL_URL}` 
+  : process.env.NEXTAUTH_URL 
+  ? process.env.NEXTAUTH_URL 
+  : 'http://localhost:3000'
+
+console.log('Using base URL for context fetch:', baseUrl)
+
+const contextResponse = await fetch(`${baseUrl}/api/user-context`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: user.email })
