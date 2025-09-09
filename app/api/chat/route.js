@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
-    console.log('DEPLOYMENT TEST: Version with tags and flagging - 10:15 AM')
+  console.log('=== CHAT API V2.1 - WITH TAGS AND FLAGGING ===')
   console.log('Environment variables loaded:')
   console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Present' : 'Missing')
   console.log('AIRTABLE_BASE_ID:', process.env.AIRTABLE_BASE_ID ? 'Present' : 'Missing')
@@ -40,23 +40,41 @@ export async function POST(request) {
       userContextData,
       user
     )
+
+    console.log('Generated AI response, now creating tags and flagging analysis...')
     
-    // SIMPLIFIED: Log both messages in one row to Airtable
+    // Generate conversation tags based on the exchange
+    const conversationTags = await generateConversationTags(message, aiResponse.content, userContextData, user)
+    
+    // Determine if this should be flagged for review
+    const flaggingAnalysis = await analyzeFlagging(message, aiResponse.content, userContextData, user)
+    
+    console.log('Tags and flagging complete, logging to Airtable...')
+
+    // Log both messages in one row to Airtable
     await logToAirtable({
       messageId,
       email: user.email,
       userMessage: message,
       solResponse: aiResponse.content,
       timestamp,
-      tokensUsed: estimatedTokens + aiResponse.tokensUsed
+      tokensUsed: estimatedTokens + aiResponse.tokensUsed,
+      tags: conversationTags,
+      flaggingAnalysis: flaggingAnalysis
     })
 
-    // DISABLED: All profile updates for now
-    console.log('Profile updates disabled for debugging')
+    console.log('Airtable logging complete, updating user profile...')
+
+    // Update user profile with basic info
+    await updateUserProfile(user.email, {
+      'Last Message Date': timestamp
+    })
+
+    console.log('Profile update complete, sending response...')
 
     return NextResponse.json({
       response: aiResponse.content,
-      tags: ['personalized', 'context-aware'],
+      tags: conversationTags,
       tokensUsed: estimatedTokens + aiResponse.tokensUsed
     })
 
@@ -79,7 +97,11 @@ async function logToAirtable(messageData) {
       'User Message': messageData.userMessage,
       'Sol Response': messageData.solResponse,
       'Timestamp': messageData.timestamp,
-      'Tokens Used': messageData.tokensUsed
+      'Tokens Used': messageData.tokensUsed,
+      'Tags': messageData.tags || [],
+      'Sol Flagged': messageData.flaggingAnalysis?.shouldFlag || false,
+      'Reason for Flagging': messageData.flaggingAnalysis?.reason || '',
+      'Add to Prompt Response Library': messageData.flaggingAnalysis?.addToLibrary || false
     }
 
     console.log('Attempting to log to Airtable with fields:', JSON.stringify(fields, null, 2))
@@ -98,7 +120,8 @@ async function logToAirtable(messageData) {
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Airtable logging error:', errorText)
-      throw new Error(`Failed to log to Airtable: ${response.status}`)
+      // Don't throw - let Sol continue working
+      return null
     }
 
     const result = await response.json()
@@ -243,7 +266,6 @@ Remember: You know this person's journey intimately when context is available. U
   return systemPrompt
 }
 
-// Function to determine which model to use
 function shouldUseGPT4(userMessage, userContextData) {
   // Use GPT-4 for complex scenarios
   const gpt4Triggers = [
@@ -270,6 +292,8 @@ function estimateTokenCount(message, history) {
 
 async function generateConversationTags(userMessage, solResponse, userContextData, user) {
   try {
+    console.log('Generating conversation tags...')
+    
     // Build context about the user for more intelligent tagging
     let contextForTagging = `User: ${user.email}\n`
     
@@ -328,6 +352,7 @@ Tags:`
       return tagsArray
     }
     
+    console.log('Tag generation failed, using fallback')
     return ['general-support'] // Fallback tag
   } catch (error) {
     console.error('Error generating conversation tags:', error)
@@ -337,6 +362,8 @@ Tags:`
 
 async function analyzeFlagging(userMessage, solResponse, userContextData, user) {
   try {
+    console.log('Analyzing flagging requirements...')
+    
     const flagPrompt = `Analyze this coaching conversation and determine:
 1. Should this be flagged for human oversight?
 2. Should this be added to the prompt response library for training?
@@ -386,6 +413,8 @@ ADD_TO_LIBRARY: true/false`
       const reasonMatch = analysis.match(/REASON: (.+)/i)
       const reason = reasonMatch ? reasonMatch[1].trim() : 'none'
       
+      console.log('Flagging analysis complete:', { shouldFlag, addToLibrary, reason })
+      
       return {
         shouldFlag,
         reason: shouldFlag ? reason : '',
@@ -393,6 +422,7 @@ ADD_TO_LIBRARY: true/false`
       }
     }
     
+    console.log('Flagging analysis failed, using defaults')
     return { shouldFlag: false, reason: '', addToLibrary: false }
   } catch (error) {
     console.error('Error analyzing flagging:', error)
@@ -402,6 +432,8 @@ ADD_TO_LIBRARY: true/false`
 
 async function updateUserProfile(email, updates) {
   try {
+    console.log('Updating user profile for:', email)
+    
     // First, find the user record
     const findResponse = await fetch(
       `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${email}"`,
