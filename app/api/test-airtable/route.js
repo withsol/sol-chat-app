@@ -34,7 +34,7 @@ export async function GET() {
     console.log('Test 3: Creating test message...')
     const testFields = {
       'Message ID': `test_${Date.now()}`,
-      'User ID': 'kelsey.cronkhite@gmail.com',
+      'User ID': ['kelsey.cronkhite@gmail.com'],
       'User Message': 'Test message',
       'Sol Response': '',
       'Timestamp': new Date().toISOString(),
