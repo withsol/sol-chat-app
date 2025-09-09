@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
+    console.log('DEPLOYMENT TEST: Version with tags and flagging - 10:15 AM')
   console.log('Environment variables loaded:')
   console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Present' : 'Missing')
   console.log('AIRTABLE_BASE_ID:', process.env.AIRTABLE_BASE_ID ? 'Present' : 'Missing')
