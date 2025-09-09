@@ -414,5 +414,10 @@ function estimateTokenCount(message, history) {
   return messageTokens + historyTokens + 1000 // Add overhead for system prompt
 }
 
-// Update user's token usage - TEMPORARILY DISABLED
-console.log('Token usage update disabled for testing')
+// Update user's token usage - TEMPORARILY DISABLED FOR TESTING
+try {
+  console.log('Would update token usage:', estimatedTokens + aiResponse.tokensUsed)
+  // await updateTokenUsage(user.email, estimatedTokens + aiResponse.tokensUsed)
+} catch (error) {
+  console.log('Token update disabled for testing')
+}
