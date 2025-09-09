@@ -279,22 +279,25 @@ export default function SolApp() {
                 </div>
               )}
               <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-              {message.tags && message.tags.length > 0 && (
+              {message.tags && (
                 <div className="mt-3 flex flex-wrap gap-1">
-                  {message.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className={`inline-block px-2 py-1 rounded-full text-xs ${
-                        message.role === 'user' 
-                          ? 'bg-indigo-500 text-white' 
-                          : 'bg-purple-100 text-purple-700'
-                      }`}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
+                  {(Array.isArray(message.tags) 
+                     ? message.tags 
+                      : message.tags.split(', ')
+                     ).map((tag, index) => (
+               <span
+                 key={index}
+                 className={`inline-block px-2 py-1 rounded-full text-xs ${
+          message.role === 'user' 
+            ? 'bg-indigo-500 text-white' 
+            : 'bg-purple-100 text-purple-700'
+        }`}
+      >
+        {tag.trim()}
+      </span>
+    ))}
+  </div>
+)}
               <p className={`text-xs mt-2 ${message.role === 'user' ? 'text-indigo-200' : 'text-gray-500'}`}>
                 {new Date(message.timestamp).toLocaleTimeString()}
               </p>
