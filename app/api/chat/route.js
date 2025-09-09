@@ -23,8 +23,21 @@ export async function POST(request) {
     if (contextResponse.ok) {
       userContextData = await contextResponse.json()
       console.log('Loaded comprehensive user context for personalized response')
+      console.log('User profile data available:', !!userContextData.userProfile)
+      console.log('Personalgorithm data count:', userContextData.personalgorithmData?.length || 0)
+      console.log('Business plans count:', userContextData.businessPlans?.length || 0)
+      console.log('Weekly check-ins count:', userContextData.weeklyCheckins?.length || 0)
+      
+      // Log specific fields we're looking for
+      if (userContextData.userProfile) {
+        console.log('Current Vision:', userContextData.userProfile['Current Vision'] ? 'Present' : 'Missing')
+        console.log('Current Goals:', userContextData.userProfile['Current Goals'] ? 'Present' : 'Missing')
+        console.log('Membership Plan:', userContextData.userProfile['Membership Plan'])
+      }
     } else {
-      console.log('Could not load user context, proceeding with basic response')
+      console.log('Could not load user context - Status:', contextResponse.status)
+      const errorText = await contextResponse.text()
+      console.log('User context error:', errorText)
     }
     
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
