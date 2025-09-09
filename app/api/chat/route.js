@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
-  console.log('=== CHAT API V2.6 - FIXED FIELD FORMATS ===')
+  console.log('=== CHAT API V2.7 - COMPLETE FIXED VERSION ===')
   console.log('Environment variables loaded:')
   console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Present' : 'Missing')
   console.log('AIRTABLE_BASE_ID:', process.env.AIRTABLE_BASE_ID ? 'Present' : 'Missing')
@@ -11,83 +11,119 @@ export async function POST(request) {
     const { message, user, conversationHistory } = await request.json()
     
     console.log('Chat request for user:', user.email)
+    console.log('User message:', message)
 
-    // FETCH USER'S COMPLETE CONTEXT DIRECTLY
-    console.log('=== FETCHING USER CONTEXT DIRECTLY ===')
-    const userContextData = await fetchUserContextDirect(user.email)
-    
-    console.log('=== USER CONTEXT DEBUG ===')
-    console.log('User profile data available:', !!userContextData.userProfile)
-    console.log('Personalgorithm data count:', userContextData.personalgorithmData?.length || 0)
-    console.log('Business plans count:', userContextData.businessPlans?.length || 0)
-    console.log('Weekly check-ins count:', userContextData.weeklyCheckins?.length || 0)
-    
-    // Log specific fields we're looking for
-    if (userContextData.userProfile) {
-      console.log('Current Vision:', userContextData.userProfile['Current Vision'] ? 'Present' : 'Missing')
-      console.log('Current Goals:', userContextData.userProfile['Current Goals'] ? 'Present' : 'Missing')
-      console.log('Membership Plan:', userContextData.userProfile['Membership Plan'] || 'None')
-      console.log('Current State:', userContextData.userProfile['Current State'] ? 'Present' : 'Missing')
+    // SAFER CONTEXT FETCH - don't let this crash the whole thing
+    let userContextData = {
+      userProfile: null,
+      personalgorithmData: [],
+      businessPlans: [],
+      weeklyCheckins: [],
+      visioningData: null,
+      contextSummary: "Context loading..."
     }
-    console.log('=== END CONTEXT DEBUG ===')
+    
+    try {
+      console.log('=== ATTEMPTING CONTEXT FETCH ===')
+      userContextData = await fetchUserContextDirect(user.email)
+      console.log('✅ Context fetch successful')
+    } catch (contextError) {
+      console.error('❌ Context fetch failed, continuing without context:', contextError)
+      // Continue without context rather than crashing
+    }
     
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     const timestamp = new Date().toISOString()
 
-    // Calculate tokens for this conversation
-    const estimatedTokens = estimateTokenCount(message, conversationHistory)
+    // SAFER AI RESPONSE GENERATION
+    let aiResponse
+    try {
+      console.log('=== ATTEMPTING AI RESPONSE ===')
+      aiResponse = await generatePersonalizedOpenAIResponse(
+        message, 
+        conversationHistory, 
+        userContextData,
+        user
+      )
+      console.log('✅ AI response successful')
+    } catch (aiError) {
+      console.error('❌ AI response failed:', aiError)
+      // Fallback response
+      aiResponse = {
+        content: `I can see your message "${message}" but I'm having some technical difficulties right now. How can I help you today?`,
+        tokensUsed: 0,
+        model: 'fallback'
+      }
+    }
 
-    // Generate PERSONALIZED AI response using OpenAI
-    const aiResponse = await generatePersonalizedOpenAIResponse(
-      message, 
-      conversationHistory, 
-      userContextData,
-      user
-    )
-
-    console.log('Generated AI response, now creating tags and flagging analysis...')
+    // SAFER TAG GENERATION
+    let conversationTags = 'general-support'
+    try {
+      conversationTags = await generateConversationTags(message, aiResponse.content, userContextData, user)
+    } catch (tagError) {
+      console.error('❌ Tag generation failed:', tagError)
+    }
     
-    // Generate conversation tags based on the exchange
-    const conversationTags = await generateConversationTags(message, aiResponse.content, userContextData, user)
+    // SAFER FLAGGING ANALYSIS
+    let flaggingAnalysis = { shouldFlag: false, reason: '', addToLibrary: false }
+    try {
+      flaggingAnalysis = await analyzeFlagging(message, aiResponse.content, userContextData, user)
+    } catch (flagError) {
+      console.error('❌ Flagging analysis failed:', flagError)
+    }
     
-    // Determine if this should be flagged for review
-    const flaggingAnalysis = await analyzeFlagging(message, aiResponse.content, userContextData, user)
-    
-    console.log('Tags and flagging complete, logging to Airtable...')
+    // SAFER AIRTABLE LOGGING - don't crash if this fails
+    try {
+      console.log('=== ATTEMPTING AIRTABLE LOGGING ===')
+      await logToAirtable({
+        messageId,
+        email: user.email,
+        userMessage: message,
+        solResponse: aiResponse.content,
+        timestamp,
+        tokensUsed: aiResponse.tokensUsed || 0,
+        tags: conversationTags,
+        flaggingAnalysis: flaggingAnalysis
+      })
+      console.log('✅ Airtable logging successful')
+    } catch (airtableError) {
+      console.error('❌ Airtable logging failed:', airtableError)
+      // Continue without logging rather than crashing
+    }
 
-    // Log both messages in one row to Airtable
-    await logToAirtable({
-      messageId,
-      email: user.email,
-      userMessage: message,
-      solResponse: aiResponse.content,
-      timestamp,
-      tokensUsed: estimatedTokens + aiResponse.tokensUsed,
-      tags: conversationTags,
-      flaggingAnalysis: flaggingAnalysis
-    })
+    // SAFER PROFILE UPDATE
+    try {
+      await updateUserProfile(user.email, {
+        'Last Message Date': timestamp
+      })
+    } catch (profileError) {
+      console.error('❌ Profile update failed:', profileError)
+    }
 
-    console.log('Airtable logging complete, updating user profile...')
-
-    // Update user profile with basic info
-    await updateUserProfile(user.email, {
-      'Last Message Date': timestamp
-    })
-
-    console.log('Profile update complete, sending response...')
+    console.log('=== SENDING RESPONSE TO USER ===')
 
     return NextResponse.json({
       response: aiResponse.content,
       tags: conversationTags,
-      tokensUsed: estimatedTokens + aiResponse.tokensUsed
+      tokensUsed: aiResponse.tokensUsed || 0,
+      debug: {
+        hasContext: !!userContextData.userProfile,
+        contextSummary: userContextData.contextSummary || 'No context available'
+      }
     })
 
   } catch (error) {
-    console.error('Chat API error:', error)
-    return NextResponse.json(
-      { error: "I'm having trouble processing that right now. Would you mind trying again?" },
-      { status: 500 }
-    )
+    console.error('❌ CRITICAL CHAT API ERROR:', error)
+    console.error('Error stack:', error.stack)
+    
+    return NextResponse.json({
+      response: "I'm experiencing some technical difficulties, but I'm still here to help. Could you try sending your message again?",
+      error: error.message,
+      debug: {
+        timestamp: new Date().toISOString(),
+        errorType: error.name
+      }
+    }, { status: 200 }) // Return 200 so app doesn't crash
   }
 }
 
@@ -153,6 +189,42 @@ async function fetchUserContextDirect(email) {
   }
 }
 
+// ==================== HELPER FUNCTION ====================
+
+async function getUserRecordId(email) {
+  try {
+    const encodedEmail = encodeURIComponent(email)
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      console.error('❌ Could not find user record')
+      return null
+    }
+
+    const data = await response.json()
+    
+    if (data.records.length === 0) {
+      console.log('⚠️ No user record found for:', email)
+      return null
+    }
+
+    return data.records[0].id
+
+  } catch (error) {
+    console.error('❌ Error getting user record ID:', error)
+    return null
+  }
+}
+
+// ==================== FETCH FUNCTIONS (FIXED FOR LINKED RECORDS) ====================
+
 async function fetchUserProfileDirect(email) {
   try {
     const encodedEmail = encodeURIComponent(email)
@@ -189,8 +261,13 @@ async function fetchUserProfileDirect(email) {
 
 async function fetchPersonalgorithmDataDirect(email) {
   try {
-    const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=10`
+    console.log('Fetching Personalgorithm™ data for:', email)
+    
+    // Get User record ID first
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) return []
+    
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™?filterByFormula={User}="${userRecordId}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=10`
     
     const response = await fetch(url, {
       headers: {
@@ -200,7 +277,7 @@ async function fetchPersonalgorithmDataDirect(email) {
     })
 
     if (!response.ok) {
-      console.error('❌ Personalgorithm™ fetch failed:', response.status)
+      console.error('❌ Personalgorithm™ data fetch failed:', response.status)
       return []
     }
 
@@ -223,8 +300,13 @@ async function fetchPersonalgorithmDataDirect(email) {
 
 async function fetchBusinessPlansDirect(email) {
   try {
-    const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned Business® Plans?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date Submitted&sort[0][direction]=desc&maxRecords=2`
+    console.log('Fetching business plans for:', email)
+    
+    // Get User record ID first
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) return []
+    
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned Business® Plans?filterByFormula={User ID}="${userRecordId}"&sort[0][field]=Date Submitted&sort[0][direction]=desc&maxRecords=2`
     
     const response = await fetch(url, {
       headers: {
@@ -251,10 +333,15 @@ async function fetchBusinessPlansDirect(email) {
 
 async function fetchWeeklyCheckinsDirect(email) {
   try {
-    const encodedEmail = encodeURIComponent(email)
+    console.log('Fetching weekly check-ins for:', email)
+    
+    // Get User record ID first
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) return []
+    
     const cutoffDate = new Date(Date.now() - 4 * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Weekly Check-in?filterByFormula=AND({User ID}="${encodedEmail}", IS_AFTER({Check-in Date}, "${cutoffDate}"))&sort[0][field]=Check-in Date&sort[0][direction]=desc&maxRecords=4`
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Weekly Check-in?filterByFormula=AND({User ID}="${userRecordId}", IS_AFTER({Check-in Date}, "${cutoffDate}"))&sort[0][field]=Check-in Date&sort[0][direction]=desc&maxRecords=4`
     
     const response = await fetch(url, {
       headers: {
@@ -281,8 +368,13 @@ async function fetchWeeklyCheckinsDirect(email) {
 
 async function fetchVisioningDataDirect(email) {
   try {
-    const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Visioning?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date of Submission&sort[0][direction]=desc&maxRecords=1`
+    console.log('Fetching visioning data for:', email)
+    
+    // Get User record ID first
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) return null
+    
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Visioning?filterByFormula={User ID}="${userRecordId}"&sort[0][field]=Date of Submission&sort[0][direction]=desc&maxRecords=1`
     
     const response = await fetch(url, {
       headers: {
@@ -314,6 +406,8 @@ async function fetchVisioningDataDirect(email) {
 
 async function fetchCoachingMethodsDirect() {
   try {
+    console.log('Fetching Aligned Business® Method content')
+    
     const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned Business® Method?maxRecords=15`
     
     const response = await fetch(url, {
@@ -345,6 +439,8 @@ async function fetchCoachingMethodsDirect() {
 
 async function fetchRecentMessagesDirect(email) {
   try {
+    console.log('Fetching recent messages for:', email)
+    
     const encodedEmail = encodeURIComponent(email)
     const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     
@@ -454,25 +550,29 @@ function buildEnhancedContextSummary(results) {
 
 async function logToAirtable(messageData) {
   try {
-    // Convert tags array to comma-separated string for Airtable
-    const tagsString = Array.isArray(messageData.tags) 
-      ? messageData.tags.join(', ') 
-      : (messageData.tags || '')
+    // Ensure tags is always a string, never an array
+    let tagsValue = ''
+    if (Array.isArray(messageData.tags)) {
+      tagsValue = messageData.tags.join(', ')
+    } else if (typeof messageData.tags === 'string') {
+      tagsValue = messageData.tags
+    }
 
     const fields = {
       'Message ID': messageData.messageId,
-      'User ID': messageData.email, // This should be plain text now
+      'User ID': messageData.email, // Plain text email for Messages table
       'User Message': messageData.userMessage,
       'Sol Response': messageData.solResponse,
       'Timestamp': messageData.timestamp,
       'Tokens Used': messageData.tokensUsed,
-      'Tags': tagsString, // String format, not array
+      'Tags': tagsValue, // Always a string
       'Sol Flagged': messageData.flaggingAnalysis?.shouldFlag || false,
       'Reason for Flagging': messageData.flaggingAnalysis?.reason || '',
       'Add to Prompt Response Library': messageData.flaggingAnalysis?.addToLibrary || false
     }
 
-    console.log('Logging to Airtable with FIXED formats:', JSON.stringify(fields, null, 2))
+    console.log('Logging to Airtable - Tags value type:', typeof tagsValue)
+    console.log('Logging to Airtable - Tags value:', tagsValue)
 
     const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Messages`, {
       method: 'POST',
@@ -488,6 +588,34 @@ async function logToAirtable(messageData) {
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Airtable logging error:', errorText)
+      
+      // If still failing, try without the problematic fields
+      if (response.status === 422) {
+        console.log('Trying simpler format...')
+        const simpleFields = {
+          'Message ID': messageData.messageId,
+          'User ID': messageData.email,
+          'User Message': messageData.userMessage,
+          'Sol Response': messageData.solResponse,
+          'Timestamp': messageData.timestamp
+        }
+        
+        const retryResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ fields: simpleFields })
+        })
+        
+        if (retryResponse.ok) {
+          const result = await retryResponse.json()
+          console.log('✅ Successfully logged to Airtable (simple format):', result.id)
+          return result
+        }
+      }
+      
       return null
     }
 
