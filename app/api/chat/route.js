@@ -1,3 +1,4 @@
+import { Main } from 'next/document'
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
