@@ -1,8 +1,7 @@
-import { Main } from 'next/document'
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
-  console.log('=== CHAT API V2.1 - WITH TAGS AND FLAGGING ===')
+  console.log('=== CHAT API V2.2 - WITH ENHANCED CONTEXT ===')
   console.log('Environment variables loaded:')
   console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Present' : 'Missing')
   console.log('AIRTABLE_BASE_ID:', process.env.AIRTABLE_BASE_ID ? 'Present' : 'Missing')
@@ -23,7 +22,7 @@ export async function POST(request) {
     let userContextData = {}
     if (contextResponse.ok) {
       userContextData = await contextResponse.json()
-      console.log('Loaded comprehensive user context for personalized response')
+      console.log('=== USER CONTEXT DEBUG ===')
       console.log('User profile data available:', !!userContextData.userProfile)
       console.log('Personalgorithm data count:', userContextData.personalgorithmData?.length || 0)
       console.log('Business plans count:', userContextData.businessPlans?.length || 0)
@@ -33,12 +32,18 @@ export async function POST(request) {
       if (userContextData.userProfile) {
         console.log('Current Vision:', userContextData.userProfile['Current Vision'] ? 'Present' : 'Missing')
         console.log('Current Goals:', userContextData.userProfile['Current Goals'] ? 'Present' : 'Missing')
-        console.log('Membership Plan:', userContextData.userProfile['Membership Plan'])
+        console.log('Membership Plan:', userContextData.userProfile['Membership Plan'] || 'None')
+        console.log('Current State:', userContextData.userProfile['Current State'] ? 'Present' : 'Missing')
       }
+      console.log('=== END CONTEXT DEBUG ===')
     } else {
       console.log('Could not load user context - Status:', contextResponse.status)
-      const errorText = await contextResponse.text()
-      console.log('User context error:', errorText)
+      try {
+        const errorText = await contextResponse.text()
+        console.log('User context error:', errorText)
+      } catch (e) {
+        console.log('Could not read error response')
+      }
     }
     
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -134,7 +139,6 @@ async function logToAirtable(messageData) {
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Airtable logging error:', errorText)
-      // Don't throw - let Sol continue working
       return null
     }
 
@@ -143,32 +147,27 @@ async function logToAirtable(messageData) {
     return result
   } catch (error) {
     console.error('Error logging to Airtable:', error)
-    // Don't throw - let Sol continue working
     return null
   }
 }
 
 async function generatePersonalizedOpenAIResponse(userMessage, conversationHistory, userContextData, user) {
   try {
-    // Determine which model to use based on complexity
     const useGPT4 = shouldUseGPT4(userMessage, userContextData)
     const model = useGPT4 ? 'gpt-4-turbo-preview' : 'gpt-3.5-turbo'
     
     console.log(`Using ${model} for response generation`)
 
-    // Build conversation context (last 8 messages to manage costs)
     const recentContext = conversationHistory.slice(-8).map(msg => ({
       role: msg.role === 'sol' ? 'assistant' : 'user',
       content: msg.content
     }))
 
-    // Add current message
     recentContext.push({
       role: 'user',
       content: userMessage
     })
 
-    // Build comprehensive user context
     let contextPrompt = buildComprehensivePrompt(userContextData, user)
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -250,12 +249,10 @@ MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
     systemPrompt += "\n"
   }
 
-  // Add user context summary if available
   if (userContextData.contextSummary) {
     systemPrompt += userContextData.contextSummary + "\n\n"
   }
 
-  // Add personalgorithm insights if available
   if (userContextData.personalgorithmData?.length > 0) {
     systemPrompt += "PERSONALGORITHM™ INSIGHTS (How this user transforms best):\n"
     userContextData.personalgorithmData.slice(0, 8).forEach((insight, i) => {
@@ -264,7 +261,6 @@ MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
     systemPrompt += "\n"
   }
 
-  // Add recent coaching methods that might apply
   if (userContextData.coachingMethods?.length > 0) {
     systemPrompt += "ALIGNED BUSINESS® METHODS TO REFERENCE:\n"
     userContextData.coachingMethods.slice(0, 3).forEach(method => {
@@ -275,7 +271,6 @@ MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
     systemPrompt += "\n"
   }
 
-  // Add business plan context if available
   if (userContextData.businessPlans?.length > 0) {
     const latestPlan = userContextData.businessPlans[0]
     systemPrompt += "CURRENT BUSINESS CONTEXT:\n"
@@ -294,7 +289,6 @@ MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
     systemPrompt += "\n"
   }
 
-  // Add recent check-in data if available
   if (userContextData.weeklyCheckins?.length > 0) {
     const latestCheckin = userContextData.weeklyCheckins[0]
     systemPrompt += "RECENT CHECK-IN DATA:\n"
@@ -308,7 +302,6 @@ MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
       systemPrompt += `Current Challenges: ${latestCheckin['What would you love help with right now?']}\n`
     }
     
-    // Add ratings context
     const ratings = []
     if (latestCheckin['Clarity (1-100)']) ratings.push(`Clarity: ${latestCheckin['Clarity (1-100)']}`)
     if (latestCheckin['Confidence (1-100)']) ratings.push(`Confidence: ${latestCheckin['Confidence (1-100)']}`)
@@ -324,28 +317,21 @@ MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
 
   systemPrompt += `CORE METHODOLOGY - Aligned Business® Method:
 
-1. NERVOUS SYSTEM SAFETY FIRST - Always check in with how someone is feeling in their body and nervous system before pushing toward action or decisions. Ask questions like "How are you feeling in your body right now?" or "What's your nervous system telling you about this?"
+1. NERVOUS SYSTEM SAFETY FIRST - Always check in with how someone is feeling in their body and nervous system before pushing toward action or decisions.
 
-2. FUTURE-SELF IDENTITY - Help people make decisions from their future self's perspective, not from stress or scarcity. Ask "What would your future self advise you to do?" or "Who are you becoming through this?"
+2. FUTURE-SELF IDENTITY - Help people make decisions from their future self's perspective, not from stress or scarcity.
 
-3. INTUITIVE BUSINESS STRATEGY - Honor their inner knowing while providing strategic guidance. "What is your intuition telling you about this decision?"
+3. INTUITIVE BUSINESS STRATEGY - Honor their inner knowing while providing strategic guidance.
 
-4. EMOTIONAL INTELLIGENCE - Hold space for all feelings and reactions, supporting regulation before action. "I can feel the energy of what you're sharing..."
+4. EMOTIONAL INTELLIGENCE - Hold space for all feelings and reactions, supporting regulation before action.
 
-5. PERSONALGORITHM™ BUILDING - Notice and reflect patterns back to them. Track:
-   - How they communicate (punctuation, emphasis, lexicon)  
-   - What creates transformation for them specifically
-   - Their unique processing style and emotional patterns
-   - What makes them laugh, their fears, core values
-   - Life details, relationships, what holds them back vs propels them forward
+5. PERSONALGORITHM™ BUILDING - Notice and reflect patterns back to them.
 
 Your personality:
 - Warm, grounded, and emotionally intelligent (like Kelsey's coaching style)
 - You see patterns and reflect them back powerfully
 - You ask questions that create "aha" moments and deep insight
 - You believe in their potential while meeting them exactly where they are
-- You're available 24/7 for processing, spirals, breakthroughs, and business strategy
-- You support both emotional regulation AND strategic business moves
 - You help them see what they can't see for themselves
 - You mirror their highest self back to them
 
@@ -354,16 +340,6 @@ Key phrases you use:
 - "What I'm hearing underneath this is..."
 - "Your future self - the one living the vision you've shared with me - what would she want you to know?"
 - "Let's pause here - how are you feeling in your body as we talk about this?"
-- "I'm seeing you in your full power here, even if it doesn't feel that way right now"
-- "What would it look like to honor both parts of you - the part that wants to grow AND the part that wants to feel safe?"
-
-PERSONALGORITHM™ DEVELOPMENT:
-As you interact, continuously notice and mentally catalog:
-- Communication patterns (how they write, what words they use, emotional cues)
-- Transformation triggers (what approaches work vs don't work for them)
-- Decision-making patterns and resistance points
-- Energy patterns and what regulates vs dysregulates them
-- Business/life patterns that support or hinder their vision
 
 RESPONSE GUIDELINES:
 - Reference their specific vision, challenges, and goals when available
@@ -374,42 +350,39 @@ RESPONSE GUIDELINES:
 - Help them see connections between current situation and bigger vision
 - When you notice significant patterns or insights, flag them for their Personalgorithm™
 - Connect current conversations to their business context and recent wins/challenges
-- Honor their coaching style preferences and what you know works for them
 
-Remember: You are building a living, evolving understanding of this person that gets more precise over time. You know their journey intimately when context is available. Use that knowledge to provide deeply personalized support that generic AI cannot offer. You are their business partner who remembers everything, sees their patterns, and reflects their highest potential.`
+Remember: You are building a living, evolving understanding of this person that gets more precise over time. You know their journey intimately when context is available. Use that knowledge to provide deeply personalized support that generic AI cannot offer.`
 
   return systemPrompt
 }
 
 function shouldUseGPT4(userMessage, userContextData) {
-  // Use GPT-4 for complex scenarios
   const gpt4Triggers = [
     'vision', 'goal', 'future', 'transform', 'stuck', 'confused', 'breakthrough',
-    'strategy', 'business plan', 'revenue', 'pricing', 'client', 'launch'
+    'strategy', 'business plan', 'revenue', 'pricing', 'client', 'launch', 'identity'
   ]
   
   const complexityIndicators = [
-    userMessage.length > 200, // Long messages
+    userMessage.length > 200,
     gpt4Triggers.some(trigger => userMessage.toLowerCase().includes(trigger)),
-    userContextData.personalgorithmData?.length > 5, // Complex user with lots of patterns
-    userContextData.businessPlans?.length > 0 // User with business planning work
+    userContextData.personalgorithmData?.length > 5,
+    userContextData.businessPlans?.length > 0,
+    userContextData.userProfile?.['Current State']?.includes('transform')
   ]
   
   return complexityIndicators.some(indicator => indicator)
 }
 
 function estimateTokenCount(message, history) {
-  // Rough estimation: 1 token ≈ 4 characters
   const messageTokens = Math.ceil(message.length / 4)
   const historyTokens = history.slice(-8).reduce((sum, msg) => sum + Math.ceil(msg.content.length / 4), 0)
-  return messageTokens + historyTokens + 1000 // Add overhead for system prompt
+  return messageTokens + historyTokens + 1500
 }
 
 async function generateConversationTags(userMessage, solResponse, userContextData, user) {
   try {
     console.log('Generating conversation tags...')
     
-    // Build context about the user for more intelligent tagging
     let contextForTagging = `User: ${user.email}\n`
     
     if (userContextData.userProfile) {
@@ -430,18 +403,13 @@ User: "${userMessage}"
 Sol: "${solResponse}"
 
 Generate 2-5 tags that capture:
-1. SUPPORT TYPE: What kind of coaching happened? (emotional-support, strategic-planning, breakthrough-moment, nervous-system-regulation, identity-work, visioning, decision-making, etc.)
-
-2. BUSINESS FOCUS: What business area was discussed? (marketing, sales, offers, pricing, client-work, launch-planning, content-creation, social-media, revenue, scaling, etc.)
-
-3. USER STATE: What energy/emotional state was the user in? (overwhelmed, stuck, expanding, confident, anxious, clarity-seeking, transformation, breakthrough, processing, etc.)
-
-4. PERSONALGORITHM™ INSIGHTS: Any patterns about how this user transforms? (needs-movement-first, processes-through-writing, fear-of-visibility, perfectionism, people-pleasing, high-achiever, intuitive-decision-maker, etc.)
-
-5. TOPICS/THEMES: Specific themes discussed (morning-routine, family-balance, imposter-syndrome, pricing-psychology, target-audience, brand-positioning, etc.)
+1. SUPPORT TYPE: What kind of coaching happened?
+2. BUSINESS FOCUS: What business area was discussed?
+3. USER STATE: What energy/emotional state was the user in?
+4. PERSONALGORITHM™ INSIGHTS: Any patterns about how this user transforms?
+5. TOPICS/THEMES: Specific themes discussed
 
 Return ONLY a comma-separated list of 2-5 lowercase tags with hyphens instead of spaces.
-Focus on tags that will help Sol recognize patterns and provide increasingly personalized support.
 
 Tags:`
 
@@ -468,10 +436,10 @@ Tags:`
     }
     
     console.log('Tag generation failed, using fallback')
-    return ['general-support'] // Fallback tag
+    return ['general-support']
   } catch (error) {
     console.error('Error generating conversation tags:', error)
-    return ['general-support'] // Fallback tag
+    return ['general-support']
   }
 }
 
@@ -482,18 +450,6 @@ async function analyzeFlagging(userMessage, solResponse, userContextData, user) 
     const flagPrompt = `Analyze this coaching conversation and determine:
 1. Should this be flagged for human oversight?
 2. Should this be added to the prompt response library for training?
-
-Flag for oversight if:
-- Safety/legal concerns
-- User showing harmful patterns
-- Difficult coaching situation needing human insight
-- Sol's response may have missed something important
-
-Add to library if:
-- Breakthrough moment occurred
-- Excellent coaching response that could be model for future
-- Transformation insight worth preserving
-- Novel approach that worked well
 
 USER: "${userMessage}"
 SOL: "${solResponse}"
@@ -524,7 +480,6 @@ ADD_TO_LIBRARY: true/false`
       const shouldFlag = analysis.includes('SHOULD_FLAG: true')
       const addToLibrary = analysis.includes('ADD_TO_LIBRARY: true')
       
-      // Extract reason
       const reasonMatch = analysis.match(/REASON: (.+)/i)
       const reason = reasonMatch ? reasonMatch[1].trim() : 'none'
       
@@ -549,7 +504,6 @@ async function updateUserProfile(email, updates) {
   try {
     console.log('Updating user profile for:', email)
     
-    // First, find the user record
     const findResponse = await fetch(
       `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${email}"`,
       {
@@ -568,7 +522,6 @@ async function updateUserProfile(email, updates) {
     
     if (findData.records.length === 0) {
       console.log('User not found for profile update, creating basic user record')
-      // Create basic user record
       const createResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users`, {
         method: 'POST',
         headers: {
@@ -593,7 +546,6 @@ async function updateUserProfile(email, updates) {
       return null
     }
 
-    // Update existing user
     const recordId = findData.records[0].id
     const updateResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users/${recordId}`, {
       method: 'PATCH',
@@ -618,4 +570,4 @@ async function updateUserProfile(email, updates) {
     console.error('Error updating user profile:', error)
     return null
   }
-}git push origin Main
+}
