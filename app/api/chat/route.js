@@ -32,15 +32,6 @@ export async function POST(request) {
     // Calculate tokens for this conversation
     const estimatedTokens = estimateTokenCount(message, conversationHistory)
 
-    // Check token limits
-    const tokenLimitCheck = await checkTokenLimits(user.email, estimatedTokens)
-    if (!tokenLimitCheck.allowed) {
-      return NextResponse.json({
-        error: tokenLimitCheck.message,
-        tokenLimitReached: true
-      }, { status: 429 })
-    }
-
     // Log user message to Airtable
     await logToAirtable({
       messageId,
@@ -74,8 +65,8 @@ export async function POST(request) {
       tags: ['sol-response', 'personalized']
     })
 
-    // Update user's token usage
-    await updateTokenUsage(user.email, estimatedTokens + aiResponse.tokensUsed)
+    // DISABLED: Update user's token usage
+    console.log('Token update disabled. Would update:', estimatedTokens + aiResponse.tokensUsed, 'tokens for', user.email)
 
     return NextResponse.json({
       response: aiResponse.content,
@@ -132,77 +123,6 @@ async function logToAirtable(messageData) {
   } catch (error) {
     console.error('Error logging to Airtable:', error)
     // Don't throw - let Sol continue working
-    return null
-  }
-}
-
-async function updateUserField(email, updates) {
-  try {
-    // First, find the user record
-    const findResponse = await fetch(
-      `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${email}"`,
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`
-        }
-      }
-    )
-
-    if (!findResponse.ok) {
-      throw new Error(`Failed to find user: ${findResponse.status}`)
-    }
-
-    const findData = await findResponse.json()
-    
-    if (findData.records.length === 0) {
-      console.log('User not found, creating new user record')
-      // Create new user if doesn't exist
-      const createResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fields: {
-            'User ID': email,
-            'Date Joined': new Date().toISOString(),
-            'Membership Plan': 'Beta Access', // Default
-            ...updates
-          }
-        })
-      })
-      
-      if (!createResponse.ok) {
-        throw new Error(`Failed to create user: ${createResponse.status}`)
-      }
-      
-      return await createResponse.json()
-    }
-
-    // Update existing user
-    const recordId = findData.records[0].id
-    const updateResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users/${recordId}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        fields: updates
-      })
-    })
-
-    if (!updateResponse.ok) {
-      throw new Error(`Failed to update user: ${updateResponse.status}`)
-    }
-
-    const result = await updateResponse.json()
-    console.log('User updated in Airtable:', result.id)
-    return result
-  } catch (error) {
-    console.error('Error updating user field:', error)
-    // Don't throw - let the conversation continue
     return null
   }
 }
@@ -357,63 +277,9 @@ function shouldUseGPT4(userMessage, userContextData) {
   return complexityIndicators.some(indicator => indicator)
 }
 
-// Token management functions
-async function checkTokenLimits(email, estimatedTokens) {
-  try {
-    // Get user's membership plan and current usage
-    const user = await fetchUserProfile(email)
-    const currentUsage = user?.['Tokens Used this Month'] || 0
-    
-    const limits = {
-      'Founding Member': 50000,
-      'Beta Access': 30000,
-      'Admin': 999999
-    }
-    
-    const userLimit = limits[user?.['Membership Plan']] || 25000
-    
-    if (currentUsage + estimatedTokens > userLimit) {
-      return {
-        allowed: false,
-        message: `Monthly token limit reached (${userLimit}). Upgrade your plan or wait until next month.`
-      }
-    }
-    
-    return { allowed: true }
-  } catch (error) {
-    console.error('Error checking token limits:', error)
-    return { allowed: true } // Allow if check fails
-  }
-}
-
-async function fetchUserProfile(email) {
-  try {
-    const response = await fetch(
-      `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${email}"`,
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`
-        }
-      }
-    )
-
-    if (!response.ok) return null
-
-    const data = await response.json()
-    return data.records[0]?.fields || null
-  } catch (error) {
-    console.error('Error fetching user profile:', error)
-    return null
-  }
-}
-
 function estimateTokenCount(message, history) {
   // Rough estimation: 1 token ≈ 4 characters
   const messageTokens = Math.ceil(message.length / 4)
   const historyTokens = history.slice(-8).reduce((sum, msg) => sum + Math.ceil(msg.content.length / 4), 0)
   return messageTokens + historyTokens + 1000 // Add overhead for system prompt
 }
-
-// Update user's token usage - TEMPORARILY DISABLED FOR TESTING
-  // Token usage update disabled for testing
-console.log('Would update tokens:', estimatedTokens + aiResponse.tokensUsed)
