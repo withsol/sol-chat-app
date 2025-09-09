@@ -414,17 +414,5 @@ function estimateTokenCount(message, history) {
   return messageTokens + historyTokens + 1000 // Add overhead for system prompt
 }
 
-async function updateTokenUsage(email, tokensUsed) {
-  try {
-    const user = await fetchUserProfile(email)
-    const currentUsage = user?.['Tokens Used this Month'] || 0
-    
-    // Update user's token usage
-    await updateUserField(email, {
-      'Tokens Used this Month': currentUsage + tokensUsed,
-      'Last Message Date': new Date().toISOString()
-    })
-  } catch (error) {
-    console.error('Error updating token usage:', error)
-  }
-}
+// Update user's token usage - TEMPORARILY DISABLED
+console.log('Token usage update disabled for testing')
