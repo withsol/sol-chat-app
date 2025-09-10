@@ -339,31 +339,31 @@ async function processUploadedFile(file, userEmail) {
         </div>
       )}
       
-      {/* Updated message content rendering */}
+      {/* Updated message content rendering - SIMPLIFIED VERSION */}
       {message.role === 'user' ? (
         // User messages stay as plain text
         <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
       ) : (
-        // Sol messages now use markdown
-        <div className="prose prose-sm max-w-none prose-headings:text-gray-800 prose-headings:font-semibold prose-p:text-gray-800 prose-p:leading-relaxed prose-strong:text-gray-900 prose-strong:font-semibold prose-em:text-gray-700 prose-em:italic prose-ul:text-gray-800 prose-ol:text-gray-800 prose-li:text-gray-800 prose-li:my-1 prose-blockquote:text-gray-700 prose-blockquote:border-l-4 prose-blockquote:border-purple-300 prose-blockquote:pl-4 prose-blockquote:italic prose-a:text-blue-600 prose-a:hover:text-blue-800 prose-a:underline">
+        // Sol messages now use markdown - MUCH SIMPLER STYLING
+        <div className="markdown-content">
           <ReactMarkdown
             components={{
-              h1: ({children}) => <h1 className="text-xl font-semibold text-gray-800 mb-3">{children}</h1>,
-              h2: ({children}) => <h2 className="text-lg font-semibold text-gray-800 mb-2">{children}</h2>,
-              h3: ({children}) => <h3 className="text-base font-semibold text-gray-800 mb-2">{children}</h3>,
-              p: ({children}) => <p className="text-gray-800 leading-relaxed mb-2">{children}</p>,
-              strong: ({children}) => <strong className="font-semibold text-gray-900">{children}</strong>,
-              em: ({children}) => <em className="italic text-gray-700">{children}</em>,
-              ul: ({children}) => <ul className="list-disc list-outside ml-4 mb-2 text-gray-800">{children}</ul>,
-              ol: ({children}) => <ol className="list-decimal list-outside ml-4 mb-2 text-gray-800">{children}</ol>,
-              li: ({children}) => <li className="text-gray-800 my-1">{children}</li>,
+              h1: ({children}) => <h1 className="text-xl font-semibold mb-3">{children}</h1>,
+              h2: ({children}) => <h2 className="text-lg font-semibold mb-2">{children}</h2>,
+              h3: ({children}) => <h3 className="text-base font-semibold mb-2">{children}</h3>,
+              p: ({children}) => <p className="mb-2 leading-relaxed">{children}</p>,
+              strong: ({children}) => <strong className="font-semibold">{children}</strong>,
+              em: ({children}) => <em className="italic">{children}</em>,
+              ul: ({children}) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+              ol: ({children}) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+              li: ({children}) => <li className="my-1">{children}</li>,
               a: ({href, children}) => (
                 <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">
                   {children}
                 </a>
               ),
               blockquote: ({children}) => (
-                <blockquote className="border-l-4 border-purple-300 pl-4 italic text-gray-700 mb-2">
+                <blockquote className="border-l-4 border-purple-300 pl-4 italic mb-2">
                   {children}
                 </blockquote>
               ),
