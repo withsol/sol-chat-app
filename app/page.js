@@ -393,7 +393,7 @@ export default function SolApp() {
           >
             <div style={{
               maxWidth: '512px',
-              backgroundColor: message.role === 'user' ? '#475569' : 'transparent',
+              backgroundColor: message.role === 'user' ? 'linear-gradient(135deg, #f8f7ff 0%, #f3f0ff 50%, #faf8ff 100%)' : 'transparent',
               color: message.role === 'user' ? 'white' : '#334155',
               borderRadius: '24px',
               padding: '28px',
@@ -523,7 +523,7 @@ export default function SolApp() {
                 value={currentMessage}
                 onChange={(e) => setCurrentMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Share what's on your mind, ask a question, or just check in..."
+                placeholder="What's coming up for you today?"
                 style={{
                   width: '100%',
                   padding: '16px 20px',
@@ -533,8 +533,8 @@ export default function SolApp() {
                   resize: 'none',
                   minHeight: '52px',
                   maxHeight: '120px',
-                  fontWeight: '400',
-                  color: '#2d3748',
+                  fontWeight: '600',
+                  color: '#5d687aff',
                   background: 'linear-gradient(135deg, #f8f7ff 0%, #f3f0ff 50%, #faf8ff 100%)',
                   fontSize: '16px',
                   lineHeight: '1.5',
@@ -564,7 +564,7 @@ export default function SolApp() {
                 onClick={() => fileInputRef.current?.click()}
                 style={{
                   padding: '14px',
-                  color: '#64748b',
+                  color: '#8d9db3ff',
                   backgroundColor: 'rgba(255, 255, 255, 0.3)',
                   border: 'none',
                   borderRadius: '10px',
@@ -582,7 +582,7 @@ export default function SolApp() {
                 disabled={!currentMessage.trim() || isTyping}
                 style={{
                   padding: '14px',
-                  backgroundColor: '#475569',
+                  backgroundColor: '#305468ff',
                   color: 'white',
                   border: 'none',
                   borderRadius: '10px',
@@ -602,7 +602,7 @@ export default function SolApp() {
             fontSize: '12px',
             color: '#64748b',
             textAlign: 'center',
-            fontWeight: '300',
+            fontWeight: '500',
             letterSpacing: '0.025em'
           }}>
             Everything you share builds your Personalgorithm™ • Powered by your Lore™ memory database
