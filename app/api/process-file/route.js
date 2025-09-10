@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import pdfParse from 'pdf-parse'
 
 export async function POST(request) {
   console.log('=== FILE PROCESSING API ===')
@@ -25,29 +24,21 @@ export async function POST(request) {
     
     // Handle different file types
     if (file.type === 'application/pdf') {
-      console.log('Processing PDF with pdf-parse...')
+      console.log('Processing PDF with alternative method...')
       
       try {
-        // Dynamic import to prevent build issues
-        const pdfParse = (await import('pdf-parse')).default
+        // Method 1: Try using built-in Node.js approach with external service
+        extractedText = await extractPDFWithExternalService(buffer, file.name)
         
-        const pdfData = await pdfParse(buffer, {
-          // Options for better text extraction
-          normalizeWhitespace: false,
-          disableCombineTextItems: false
-        })
-        
-        extractedText = pdfData.text
-        console.log('PDF extraction successful:', {
-          pages: pdfData.numpages,
-          textLength: extractedText.length,
-          info: pdfData.info?.Title || 'No title'
-        })
+        if (!extractedText) {
+          // Method 2: Fallback to simple buffer analysis
+          extractedText = await extractPDFWithBufferAnalysis(buffer)
+        }
         
       } catch (pdfError) {
         console.error('PDF processing error:', pdfError)
         return NextResponse.json({ 
-          error: 'Failed to process PDF. The file may be corrupted or password-protected. Please try converting to text or copying the content directly.',
+          error: 'Failed to process PDF. Please try one of these alternatives: 1) Copy and paste the text directly into chat, 2) Save as .txt file and upload, 3) Use Google Docs to convert PDF to text.',
           details: pdfError.message
         }, { status: 400 })
       }
@@ -62,7 +53,7 @@ export async function POST(request) {
 
     if (!extractedText || extractedText.trim().length === 0) {
       return NextResponse.json({ 
-        error: 'Could not extract text from file. The PDF may be image-based or empty. Please try copying and pasting the content directly.' 
+        error: 'Could not extract text from file. The PDF may be image-based, password-protected, or corrupted. Please copy and paste the content directly.' 
       }, { status: 400 })
     }
 
@@ -172,6 +163,69 @@ export async function POST(request) {
       error: 'Failed to process file',
       details: error.message
     }, { status: 500 })
+  }
+}
+
+// ==================== PDF EXTRACTION METHODS ====================
+
+async function extractPDFWithExternalService(buffer, filename) {
+  try {
+    // Use PDFShift API or similar service for PDF text extraction
+    // This is a placeholder - you'd need to sign up for a service like PDFShift
+    console.log('Attempting external PDF service extraction...')
+    
+    // For now, return null to trigger fallback method
+    return null
+  } catch (error) {
+    console.error('External PDF service failed:', error)
+    return null
+  }
+}
+
+async function extractPDFWithBufferAnalysis(buffer) {
+  try {
+    // Simple text extraction from PDF buffer
+    // This works for some PDFs but not all
+    const bufferString = buffer.toString('binary')
+    
+    // Look for text content in the PDF structure
+    const textMatches = bufferString.match(/\((.*?)\)/g)
+    
+    if (textMatches) {
+      const extractedText = textMatches
+        .map(match => match.replace(/[()]/g, ''))
+        .filter(text => text.length > 2)
+        .join(' ')
+      
+      if (extractedText.length > 50) {
+        console.log('Buffer analysis extraction successful')
+        return extractedText
+      }
+    }
+    
+    // Alternative: Look for stream content
+    const streamMatches = bufferString.match(/stream\s*(.*?)\s*endstream/gs)
+    
+    if (streamMatches) {
+      const streamText = streamMatches
+        .map(match => match.replace(/stream|endstream/g, ''))
+        .join(' ')
+        .replace(/[^\x20-\x7E]/g, ' ') // Remove non-printable characters
+        .replace(/\s+/g, ' ')
+        .trim()
+      
+      if (streamText.length > 50) {
+        console.log('Stream analysis extraction successful')
+        return streamText
+      }
+    }
+    
+    console.log('Buffer analysis could not extract meaningful text')
+    return null
+    
+  } catch (error) {
+    console.error('Buffer analysis failed:', error)
+    return null
   }
 }
 
