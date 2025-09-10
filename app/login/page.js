@@ -1,65 +1,13 @@
-'use client'
-
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { AlertCircle, Loader2 } from 'lucide-react'
-
-export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
-  const router = useRouter()
-
-  const handleLogin = async (e) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError('')
-
-    try {
-      // Verify subscription with Thrivecart
-      const response = await fetch('/api/auth/thrivecart', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      })
-
-      const result = await response.json()
-
-      if (result.hasActiveSubscription) {
-        // Store user session
-        localStorage.setItem('sol_user', JSON.stringify({
-          email,
-          authenticated: true,
-          loginTime: new Date().toISOString()
-        }))
-        
-        // Redirect to Sol chat
-        router.push('/')
-      } else {
-        setError('No active subscription found. Please ensure you have an active subscription to The Art of Becoming program.')
-      }
-    } catch (error) {
-      console.error('Login error:', error)
-      setError('Unable to verify your subscription. Please try again.')
-    }
-
-    setIsLoading(false)
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4">
-            S
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Welcome to Sol™</h1>
-          <p className="text-gray-600">Your AI Business Partner</p>
-        </div>
-
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+<div onSubmit={handleLogin}>
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#1e293b',
+              marginBottom: '8px',
+              letterSpacing: '0.025em'
+            }}>
               Email Address
             </label>
             <input
@@ -68,38 +16,119 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter the email used for your Sol course enrollment"
-              className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              style={{
+                width: '100%',
+                padding: '16px 20px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '12px',
+                outline: 'none',
+                fontSize: '16px',
+                fontWeight: '400',
+                color: '#2d3748',
+                background: '#fefefe',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                opacity: isLoading ? 0.6 : 1
+              }}
               required
               disabled={isLoading}
+              onFocus={(e) => {
+                e.target.style.boxShadow = '0 2px 8px rgba(71, 85, 105, 0.15)'
+                e.target.style.borderColor = 'rgba(71, 85, 105, 0.3)'
+              }}
+              onBlur={(e) => {
+                e.target.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.05)'
+                e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+              }}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleLogin(e)
+                }
+              }}
             />
-            <p className="mt-2 text-sm text-gray-500">
+            <p style={{
+              marginTop: '8px',
+              fontSize: '14px',
+              color: '#64748b',
+              fontWeight: '300',
+              lineHeight: '1.5'
+            }}>
               Use the same email address you used to enroll in the Sol course.
             </p>
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start space-x-3">
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <div className="text-red-700 text-sm">{error}</div>
+            <div style={{
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              borderRadius: '12px',
+              padding: '16px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+              marginBottom: '24px'
+            }}>
+              <AlertCircle style={{ 
+                width: '20px', 
+                height: '20px', 
+                color: '#ef4444', 
+                flexShrink: 0, 
+                marginTop: '2px' 
+              }} />
+              <div style={{ 
+                color: '#dc2626', 
+                fontSize: '14px',
+                fontWeight: '400',
+                lineHeight: '1.5'
+              }}>{error}</div>
             </div>
           )}
 
           <button
-            type="submit"
+            onClick={handleLogin}
             disabled={isLoading || !email}
-            className="w-full bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-4 px-6 rounded-xl hover:from-purple-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center space-x-2"
+            style={{
+              width: '100%',
+              backgroundColor: '#475569',
+              color: 'white',
+              padding: '16px 24px',
+              borderRadius: '12px',
+              border: 'none',
+              fontSize: '16px',
+              fontWeight: '500',
+              letterSpacing: '0.025em',
+              cursor: (!email || isLoading) ? 'not-allowed' : 'pointer',
+              boxShadow: '0 10px 15px -3px rgba(71, 85, 105, 0.3)',
+              transition: 'all 0.2s ease',
+              opacity: (!email || isLoading) ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+            }}
+            onMouseOver={(e) => {
+              if (!isLoading && email) {
+                e.target.style.backgroundColor = '#334155'
+                e.target.style.transform = 'translateY(-1px)'
+                e.target.style.boxShadow = '0 20px 25px -5px rgba(71, 85, 105, 0.4)'
+              }
+            }}
+            onMouseOut={(e) => {
+              e.target.style.backgroundColor = '#475569'
+              e.target.style.transform = 'translateY(0)'
+              e.target.style.boxShadow = '0 10px 15px -3px rgba(71, 85, 105, 0.3)'
+            }}
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite' }} />
                 <span>Verifying course access...</span>
               </>
             ) : (
               <span>Access Sol™</span>
             )}
           </button>
-        </form>
-      </div>
-    </div>
-  )
-}
+        </div>
