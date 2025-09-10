@@ -40,35 +40,129 @@ function detectVisioningIntent(userMessage) {
 
 async function handleVisioningGuidance(userMessage, userContextData, user) {
   try {
-    // Check if user has completed visioning
-    const hasVisioning = userContextData.visioningData !== null
+    const message = userMessage.toLowerCase()
     
-    // Check if they're providing a document
-    const documentType = detectDocumentType(userMessage)
-    if (documentType) {
-      if (documentType === 'visioning') {
-        return {
-          content: `Perfect! I can see you're sharing your visioning homework. Could you paste the text content here so I can extract all the insights and build your Personalgorithm™? I'll process everything from your comprehensive visioning document and update your profile with your vision, goals, ideal client details, and more.`,
-          hasVisioningGuidance: true
+    // Check if they're sharing actual visioning content
+    const hasVisioningContent = userMessage.length > 500 && (
+      message.includes('basic brand analysis') ||
+      message.includes('audience analysis') ||
+      message.includes('competitive analysis') ||
+      message.includes('free write') ||
+      message.includes('current reality') ||
+      message.includes('mission statement') ||
+      message.includes('core values') ||
+      message.includes('ideal audience member')
+    )
+    
+    // Check if they're sharing business plan content  
+    const hasBusinessPlanContent = userMessage.length > 300 && (
+      message.includes('future vision') ||
+      message.includes('top 3 goals') ||
+      message.includes('ideal client') ||
+      message.includes('marketing system') ||
+      message.includes('sales system') ||
+      message.includes('aligned business plan')
+    )
+    
+    if (hasVisioningContent) {
+      console.log('🎯 Detected visioning content, processing...')
+      
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/process-visioning`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email,
+            visioningText: userMessage
+          })
+        })
+        
+        if (response.ok) {
+          const result = await response.json()
+          return {
+            content: `🎯 Incredible! I've processed your visioning homework and extracted ${result.personalgorithmCount || 0} Personalgorithm™ insights about how you work best. 
+
+I can see your business is focused on ${result.extractedInsights?.industry || 'your industry'} and your vision is coming together beautifully. Your ideal client clarity and business goals are now part of my understanding of you.
+
+What feels most important to focus on first from everything you've shared?`,
+            hasVisioningGuidance: true
+          }
+        } else {
+          console.error('Visioning processing failed:', response.status)
+          return {
+            content: `I can see you're sharing your visioning homework with me! There was a technical hiccup processing it, but I caught the key themes. Based on what you've shared, what's the most important thing you want to work on right now?`,
+            hasVisioningGuidance: true
+          }
         }
-      } else if (documentType === 'business-plan') {
+      } catch (error) {
+        console.error('Visioning processing error:', error)
         return {
-          content: `Great! I can see you're sharing your Aligned Business Plan. Could you paste the content here so I can process it and add the strategic insights to your Personalgorithm™? I'll extract your business vision, goals, ideal client profile, and strategic context.`,
+          content: `Thank you for sharing your comprehensive visioning work! I can see the depth of thought you've put into this. What's the main area you'd like my support with based on everything you've shared?`,
           hasVisioningGuidance: true
         }
       }
     }
     
-    // Original visioning guidance for help requests
-    if (!hasVisioning && detectVisioningIntent(userMessage)) {
+    if (hasBusinessPlanContent) {
+      console.log('💼 Detected business plan content, processing...')
+      
+      try {
+        // Extract basic business plan data
+        const businessPlanData = {
+          futureVision: extractSection(userMessage, ['future vision', 'vision']),
+          topGoals: extractSection(userMessage, ['top 3 goals', 'goals']),
+          challenges: extractSection(userMessage, ['challenges', 'problems']),
+          idealClient: extractSection(userMessage, ['ideal client', 'target client']),
+          currentOffers: extractSection(userMessage, ['offers', 'services', 'current offers']),
+          marketingSystem: extractSection(userMessage, ['marketing system', 'marketing']),
+          salesSystem: extractSection(userMessage, ['sales system', 'sales'])
+        }
+        
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/process-business-plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email,
+            businessPlanData: businessPlanData
+          })
+        })
+        
+        if (response.ok) {
+          const result = await response.json()
+          return {
+            content: `💼 Excellent! I've processed your Aligned Business Plan and added the strategic insights to your Personalgorithm™. I can see your business vision and goals clearly now.
+
+Based on your plan, what's the most important focus area for the next 30 days?`,
+            hasVisioningGuidance: true
+          }
+        }
+      } catch (error) {
+        console.error('Business plan processing error:', error)
+      }
+      
       return {
-        content: `I can see you're interested in working on your visioning! I have a couple of ways we can approach this:
+        content: `I can see you're sharing your business plan with me! Thank you for the strategic context. What's the most important area you want to focus on from your plan?`,
+        hasVisioningGuidance: true
+      }
+    }
+    
+    // Check if user has completed visioning and is asking for help
+    const hasVisioning = userContextData.visioningData !== null
+    const needsVisioningHelp = !hasVisioning && (
+      message.includes('visioning') || 
+      message.includes('vision homework') ||
+      message.includes('help with vision')
+    )
+    
+    if (needsVisioningHelp) {
+      return {
+        content: `I'd love to help you with your visioning! Here are your options:
 
-**Option 1: Use the Airtable Form** - I have a structured form where you can input your visioning details section by section: https://airtable.com/appbxBGiXlAatoYsV/pagxUmPB9uh1c9Tqz/form
+**Option 1: Share Your Completed Visioning** - If you've already filled out comprehensive visioning homework, you can paste the text directly here and I'll extract all the insights to build your Personalgorithm™.
 
-**Option 2: Share Your Completed Document** - If you've already filled out your comprehensive visioning homework, you can share the text with me here and I'll extract all the key insights to build your Personalgorithm™.
+**Option 2: Work Through It Together** - I can guide you through the key visioning questions to help you clarify your business vision, ideal client, and goals.
 
-**Option 3: Work Through It Together** - I can ask you thoughtful questions to help you explore each area of your vision, values, ideal client, challenges, and goals.
+**Option 3: Use the Airtable Form** - I have a structured form: https://airtable.com/appbxBGiXlAatoYsV/pagxUmPB9uh1c9Tqz/form
 
 Which approach feels right for you?`,
         hasVisioningGuidance: true
@@ -81,6 +175,30 @@ Which approach feels right for you?`,
     console.error('Error in visioning guidance:', error)
     return null
   }
+}
+
+// Helper function for extracting sections
+function extractSection(text, keywords) {
+  const lines = text.split('\n')
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].toLowerCase()
+    
+    if (keywords.some(keyword => line.includes(keyword))) {
+      // Found a matching section, extract the content
+      let content = []
+      for (let j = i + 1; j < lines.length && j < i + 8; j++) {
+        const nextLine = lines[j].trim()
+        if (nextLine.length === 0) continue
+        if (nextLine.length < 5) break // Likely a header for next section
+        content.push(nextLine)
+        if (content.join(' ').length > 300) break
+      }
+      return content.join(' ')
+    }
+  }
+  
+  return ''
 }
 
 // ==================== ENHANCED PROMPT BUILDING ====================
@@ -217,19 +335,15 @@ Remember: You have access to their complete journey when context is available. U
 }
 
 export async function POST(request) {
-  console.log('=== CHAT API V3.1 - WITH VISIONING DETECTION & ENHANCED COACHING ===')
-  console.log('Environment variables loaded:')
-  console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? 'Present' : 'Missing')
-  console.log('AIRTABLE_BASE_ID:', process.env.AIRTABLE_BASE_ID ? 'Present' : 'Missing')
-  console.log('AIRTABLE_TOKEN:', process.env.AIRTABLE_TOKEN ? 'Present' : 'Missing')
+  console.log('=== CHAT API V3.2 - WITH VISIONING & BUSINESS PLAN DETECTION ===')
   
   try {
     const { message, user, conversationHistory } = await request.json()
     
     console.log('Chat request for user:', user.email)
-    console.log('User message:', message)
+    console.log('User message length:', message.length)
 
-    // SAFER CONTEXT FETCH - don't let this crash the whole thing
+    // SAFER CONTEXT FETCH
     let userContextData = {
       userProfile: null,
       personalgorithmData: [],
@@ -245,13 +359,54 @@ export async function POST(request) {
       console.log('✅ Context fetch successful')
     } catch (contextError) {
       console.error('❌ Context fetch failed, continuing without context:', contextError)
-      // Continue without context rather than crashing
     }
     
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     const timestamp = new Date().toISOString()
 
-    // SAFER AI RESPONSE GENERATION
+    // 🎯 CHECK FOR VISIONING/BUSINESS PLAN CONTENT FIRST
+    const visioningGuidance = await handleVisioningGuidance(message, userContextData, user)
+    if (visioningGuidance && visioningGuidance.hasVisioningGuidance) {
+      console.log('✅ Visioning/Business Plan content detected and processed')
+      
+      // Still log this important interaction
+      try {
+        await logToAirtable({
+          messageId,
+          email: user.email,
+          userMessage: message,
+          solResponse: visioningGuidance.content,
+          timestamp,
+          tokensUsed: 0,
+          tags: 'visioning-processed, document-intake',
+          flaggingAnalysis: { shouldFlag: false, reason: '', addToLibrary: true }
+        })
+      } catch (logError) {
+        console.error('❌ Failed to log visioning interaction:', logError)
+      }
+
+      // Update profile
+      try {
+        await updateUserProfile(user.email, {
+          'Last Message Date': timestamp
+        })
+      } catch (profileError) {
+        console.error('❌ Profile update failed:', profileError)
+      }
+
+      return NextResponse.json({
+        response: visioningGuidance.content,
+        tags: 'visioning-processed, document-intake',
+        tokensUsed: 0,
+        debug: {
+          hasContext: !!userContextData.userProfile,
+          visioningProcessed: true,
+          contextSummary: userContextData.contextSummary || 'No context available'
+        }
+      })
+    }
+
+    // REGULAR AI RESPONSE GENERATION
     let aiResponse
     try {
       console.log('=== ATTEMPTING AI RESPONSE ===')
@@ -264,7 +419,6 @@ export async function POST(request) {
       console.log('✅ AI response successful')
     } catch (aiError) {
       console.error('❌ AI response failed:', aiError)
-      // Fallback response
       aiResponse = {
         content: `I can see your message "${message}" but I'm having some technical difficulties right now. How can I help you today?`,
         tokensUsed: 0,
@@ -288,7 +442,7 @@ export async function POST(request) {
       console.error('❌ Flagging analysis failed:', flagError)
     }
     
-    // SAFER AIRTABLE LOGGING - don't crash if this fails
+    // SAFER AIRTABLE LOGGING
     try {
       console.log('=== ATTEMPTING AIRTABLE LOGGING ===')
       await logToAirtable({
@@ -304,25 +458,19 @@ export async function POST(request) {
       console.log('✅ Airtable logging successful')
     } catch (airtableError) {
       console.error('❌ Airtable logging failed:', airtableError)
-      // Continue without logging rather than crashing
     }
 
-    // PERSONALGORITHM™ ANALYSIS TRIGGER - ADD THIS
-  if (aiResponse.content && !aiResponse.content.includes('technical difficulties')) {
-  triggerPersonalgorithmAnalysis(user.email, message, aiResponse.content, conversationHistory)
-  }
-
-    
-
-    // *** NEW: SOL AUTO-UPDATE SYSTEM ***
-    // Only run if we got a real AI response (not fallback)
+    // PERSONALGORITHM™ ANALYSIS TRIGGER
     if (aiResponse.content && !aiResponse.content.includes('technical difficulties')) {
-      // Run async to not slow down the chat response
+      triggerPersonalgorithmAnalysis(user.email, message, aiResponse.content, conversationHistory)
+    }
+
+    // SOL AUTO-UPDATE SYSTEM
+    if (aiResponse.content && !aiResponse.content.includes('technical difficulties')) {
       setTimeout(() => {
         detectAndPerformUpdates(user.email, message, aiResponse.content, userContextData)
       }, 1000)
       
-      // Check if weekly digest is needed
       const lastMessageDate = userContextData.userProfile?.['Last Message Date']
       const daysSinceLastMessage = lastMessageDate ? 
         (Date.now() - new Date(lastMessageDate).getTime()) / (1000 * 60 * 60 * 24) : 7
@@ -332,7 +480,7 @@ export async function POST(request) {
       }
     }
 
-    // SAFER PROFILE UPDATE (now enhanced by auto-update system)
+    // SAFER PROFILE UPDATE
     try {
       await updateUserProfile(user.email, {
         'Last Message Date': timestamp
@@ -364,7 +512,7 @@ export async function POST(request) {
         timestamp: new Date().toISOString(),
         errorType: error.name
       }
-    }, { status: 200 }) // Return 200 so app doesn't crash
+    }, { status: 200 })
   }
 }
 
@@ -646,14 +794,10 @@ async function updateUserVision(email, visionUpdate, userContextData) {
 
 async function createPersonalgorithmEntryNew(email, notes, tags = ['auto-generated']) {
   try {
-    // First get user record ID for linking
-    const userRecordId = await getUserRecordId(email)
-    if (!userRecordId) {
-      console.error('Cannot create Personalgorithm entry - user record not found')
-      return null
-    }
-
     const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    console.log('Creating Personalgorithm™ entry for:', email)
+    console.log('Notes:', notes.substring(0, 100) + '...')
     
     const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™`, {
       method: 'POST',
@@ -664,26 +808,26 @@ async function createPersonalgorithmEntryNew(email, notes, tags = ['auto-generat
       body: JSON.stringify({
         fields: {
           'Personalgorithm™ ID': personalgorithmId,
-          'User': [userRecordId], // Link to user record
+          'User ID': email, // FIXED: Use email directly as single line text
           'Personalgorithm™ Notes': notes,
-          'Date created': new Date().toISOString(),
           'Tags': Array.isArray(tags) ? tags.join(', ') : tags
+          // Date created will be auto-generated by Airtable
         }
       })
     })
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Failed to create Personalgorithm entry:', response.status, errorText)
+      console.error('Failed to create Personalgorithm™ entry:', response.status, errorText)
       return null
     }
 
     const result = await response.json()
-    console.log('✅ Personalgorithm entry created:', result.id)
+    console.log('✅ Personalgorithm™ entry created successfully:', result.id)
     return result
     
   } catch (error) {
-    console.error('Error creating Personalgorithm entry:', error)
+    console.error('Error creating Personalgorithm™ entry:', error)
     return null
   }
 }
@@ -975,7 +1119,7 @@ async function fetchBusinessPlansDirect(email) {
     const userRecordId = await getUserRecordId(email)
     if (!userRecordId) return []
     
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned Business® Plans?filterByFormula={User ID}="${userRecordId}"&sort[0][field]=Date Submitted&sort[0][direction]=desc&maxRecords=2`
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned Business® Plans?filterByFormula=FIND("${userRecordId}", ARRAYJOIN({User ID}))>0&sort[0][field]=Date Submitted&sort[0][direction]=desc&maxRecords=2`
     
     const response = await fetch(url, {
       headers: {
@@ -1010,7 +1154,7 @@ async function fetchWeeklyCheckinsDirect(email) {
     
     const cutoffDate = new Date(Date.now() - 4 * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Weekly Check-in?filterByFormula=AND({User ID}="${userRecordId}", IS_AFTER({Check-in Date}, "${cutoffDate}"))&sort[0][field]=Check-in Date&sort[0][direction]=desc&maxRecords=4`
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Weekly Check-in?filterByFormula=AND(FIND("${userRecordId}", ARRAYJOIN({User ID}))>0, IS_AFTER({Check-in Date}, "${cutoffDate}"))&sort[0][field]=Check-in Date&sort[0][direction]=desc&maxRecords=4`
     
     const response = await fetch(url, {
       headers: {
@@ -1043,7 +1187,7 @@ async function fetchVisioningDataDirect(email) {
     const userRecordId = await getUserRecordId(email)
     if (!userRecordId) return null
     
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Visioning?filterByFormula={User ID}="${userRecordId}"&sort[0][field]=Date of Submission&sort[0][direction]=desc&maxRecords=1`
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Visioning?filterByFormula=FIND("${userRecordId}", ARRAYJOIN({User ID}))>0&sort[0][field]=Date of Submission&sort[0][direction]=desc&maxRecords=1`
     
     const response = await fetch(url, {
       headers: {
