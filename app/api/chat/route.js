@@ -216,8 +216,6 @@ Remember: You have access to their complete journey when context is available. U
   return systemPrompt
 }
 
-// ==================== MAIN CHAT API ====================
-
 export async function POST(request) {
   console.log('=== CHAT API V3.1 - WITH VISIONING DETECTION & ENHANCED COACHING ===')
   console.log('Environment variables loaded:')
@@ -309,35 +307,12 @@ export async function POST(request) {
       // Continue without logging rather than crashing
     }
 
-    async function triggerPersonalgorithmAnalysis(email, userMessage, solResponse, conversationHistory) {
-  try {
-    // Don't await this - run in background to not slow down chat response
-    setTimeout(async () => {
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/analyze-message-personalgorithm`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            userMessage,
-            solResponse,
-            conversationContext: conversationHistory.slice(-3)
-          })
-        })
-        
-        if (response.ok) {
-          const result = await response.json()
-          console.log('🧠 Personalgorithm™ analysis completed:', result.entriesCreated, 'new insights')
-        }
-      } catch (error) {
-        console.error('Background Personalgorithm™ analysis failed:', error)
-      }
-    }, 1000) // 1 second delay to not impact chat response time
-
-  } catch (error) {
-    console.error('Error triggering Personalgorithm™ analysis:', error)
+    // PERSONALGORITHM™ ANALYSIS TRIGGER - ADD THIS
+  if (aiResponse.content && !aiResponse.content.includes('technical difficulties')) {
+  triggerPersonalgorithmAnalysis(user.email, message, aiResponse.content, conversationHistory)
   }
-}
+
+    
 
     // *** NEW: SOL AUTO-UPDATE SYSTEM ***
     // Only run if we got a real AI response (not fallback)
@@ -390,6 +365,34 @@ export async function POST(request) {
         errorType: error.name
       }
     }, { status: 200 }) // Return 200 so app doesn't crash
+  }
+}
+
+async function triggerPersonalgorithmAnalysis(email, userMessage, solResponse, conversationHistory) {
+  try {
+    setTimeout(async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/analyze-message-personalgorithm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            userMessage,
+            solResponse,
+            conversationContext: conversationHistory.slice(-3)
+          })
+        })
+        
+        if (response.ok) {
+          const result = await response.json()
+          console.log('🧠 Personalgorithm™ analysis completed:', result.entriesCreated, 'new insights')
+        }
+      } catch (error) {
+        console.error('Background Personalgorithm™ analysis failed:', error)
+      }
+    }, 1000)
+  } catch (error) {
+    console.error('Error triggering Personalgorithm™ analysis:', error)
   }
 }
 
@@ -931,11 +934,9 @@ async function fetchPersonalgorithmDataDirect(email) {
   try {
     console.log('Fetching Personalgorithm™ data for:', email)
     
-    // Get User record ID first
-    const userRecordId = await getUserRecordId(email)
-    if (!userRecordId) return []
-    
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™?filterByFormula={User}="${userRecordId}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=10`
+    // FIXED: Filter by email directly since User ID field contains email
+    const encodedEmail = encodeURIComponent(email)
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=10`
     
     const response = await fetch(url, {
       headers: {
