@@ -1,16 +1,399 @@
-@import 'tailwindcss/base';
-@import 'tailwindcss/components'; 
-@import 'tailwindcss/utilities';
+/* CREATE OR UPDATE: app/globals.css with this styling */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-body {
-  font-family: 'Inter', sans-serif;
+:root {
+  /* Inspired by the organic, earthy palette */
+  --primary-sage: #A4B494;
+  --primary-warm: #E8DDD4;
+  --primary-cream: #F5F1EB;
+  --accent-terracotta: #D4A574;
+  --accent-mauve: #C9A9A6;
+  --text-dark: #2C3E2D;
+  --text-medium: #5A6B5D;
+  --text-light: #8B9A8E;
+  --background-main: #FEFCF9;
+  --border-soft: #E8E2DB;
+  --shadow-soft: 0 2px 12px rgba(44, 62, 45, 0.08);
+  --shadow-medium: 0 4px 20px rgba(44, 62, 45, 0.12);
 }
 
-/* Add this to test */
-.test-class {
-  background-color: red !important;
-  color: white !important;
-  padding: 1rem !important;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-dark);
+  background: var(--background-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Main chat container */
+.chat-container {
+  max-width: 800px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--background-main);
+}
+
+/* Header styling */
+.chat-header {
+  background: linear-gradient(135deg, var(--primary-sage), var(--accent-terracotta));
+  color: white;
+  padding: 24px 32px;
+  text-align: center;
+  box-shadow: var(--shadow-soft);
+}
+
+.chat-header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
+.chat-header p {
+  font-size: 16px;
+  opacity: 0.9;
+  font-weight: 300;
+}
+
+/* Messages area */
+.messages-container {
+  flex: 1;
+  padding: 32px 24px;
+  overflow-y: auto;
+  background: var(--background-main);
+}
+
+/* Individual message styling */
+.message {
+  margin-bottom: 32px;
+  max-width: 100%;
+}
+
+.message-user {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.message-sol {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.message-content {
+  max-width: 85%;
+  padding: 20px 24px;
+  border-radius: 20px;
+  position: relative;
+  box-shadow: var(--shadow-soft);
+  line-height: 1.7;
+}
+
+.message-content.user {
+  background: linear-gradient(135deg, var(--primary-sage), var(--accent-terracotta));
+  color: white;
+  border-bottom-right-radius: 8px;
+}
+
+.message-content.sol {
+  background: var(--primary-cream);
+  color: var(--text-dark);
+  border: 1px solid var(--border-soft);
+  border-bottom-left-radius: 8px;
+}
+
+/* Sol response typography and formatting */
+.message-content.sol {
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+/* Typography hierarchy for Sol responses */
+.message-content.sol h1,
+.message-content.sol h2,
+.message-content.sol h3 {
+  color: var(--text-dark);
+  margin: 24px 0 16px 0;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.message-content.sol h1 {
+  font-size: 24px;
+  border-bottom: 2px solid var(--primary-sage);
+  padding-bottom: 8px;
+}
+
+.message-content.sol h2 {
+  font-size: 20px;
+  color: var(--primary-sage);
+}
+
+.message-content.sol h3 {
+  font-size: 18px;
+  color: var(--text-medium);
+}
+
+/* Paragraph spacing */
+.message-content.sol p {
+  margin: 16px 0;
+  color: var(--text-dark);
+}
+
+/* Bold and italic text */
+.message-content.sol strong,
+.message-content.sol b {
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.message-content.sol em,
+.message-content.sol i {
+  font-style: italic;
+  color: var(--text-medium);
+}
+
+/* Lists styling */
+.message-content.sol ul,
+.message-content.sol ol {
+  margin: 16px 0;
+  padding-left: 24px;
+}
+
+.message-content.sol li {
+  margin: 8px 0;
+  color: var(--text-dark);
+}
+
+.message-content.sol ul li {
+  list-style: none;
+  position: relative;
+}
+
+.message-content.sol ul li::before {
+  content: "•";
+  color: var(--primary-sage);
+  font-weight: bold;
+  position: absolute;
+  left: -16px;
+  font-size: 18px;
+}
+
+/* Links styling */
+.message-content.sol a {
+  color: var(--primary-sage);
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.message-content.sol a:hover {
+  border-bottom-color: var(--primary-sage);
+  color: var(--accent-terracotta);
+}
+
+/* Blockquotes */
+.message-content.sol blockquote {
+  border-left: 4px solid var(--primary-sage);
+  padding-left: 20px;
+  margin: 20px 0;
+  color: var(--text-medium);
+  font-style: italic;
+  background: var(--primary-warm);
+  padding: 16px 20px;
+  border-radius: 8px;
+}
+
+/* Code styling */
+.message-content.sol code {
+  background: var(--primary-warm);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 14px;
+  color: var(--text-dark);
+}
+
+.message-content.sol pre {
+  background: var(--primary-warm);
+  padding: 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 16px 0;
+}
+
+/* Input area */
+.input-container {
+  padding: 24px;
+  background: var(--primary-cream);
+  border-top: 1px solid var(--border-soft);
+  box-shadow: 0 -2px 12px rgba(44, 62, 45, 0.06);
+}
+
+.input-form {
+  display: flex;
+  gap: 12px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.message-input {
+  flex: 1;
+  padding: 16px 20px;
+  border: 2px solid var(--border-soft);
+  border-radius: 25px;
+  font-size: 16px;
+  font-family: inherit;
+  background: white;
+  color: var(--text-dark);
+  transition: all 0.2s ease;
+  resize: none;
+  min-height: 24px;
+  max-height: 120px;
+}
+
+.message-input:focus {
+  outline: none;
+  border-color: var(--primary-sage);
+  box-shadow: 0 0 0 3px rgba(164, 180, 148, 0.1);
+}
+
+.send-button {
+  padding: 16px 24px;
+  background: linear-gradient(135deg, var(--primary-sage), var(--accent-terracotta));
+  color: white;
+  border: none;
+  border-radius: 25px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 16px;
+}
+
+.send-button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-medium);
+}
+
+.send-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Loading state */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-light);
+  font-style: italic;
+  padding: 16px 0;
+}
+
+.typing-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.typing-dots span {
+  width: 6px;
+  height: 6px;
+  background: var(--primary-sage);
+  border-radius: 50%;
+  animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+.typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes typing {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .chat-header {
+    padding: 20px 24px;
+  }
+  
+  .chat-header h1 {
+    font-size: 24px;
+  }
+  
+  .messages-container {
+    padding: 24px 16px;
+  }
+  
+  .message-content {
+    max-width: 95%;
+    padding: 16px 20px;
+  }
+  
+  .input-container {
+    padding: 16px;
+  }
+  
+  .input-form {
+    flex-direction: column;
+  }
+  
+  .send-button {
+    align-self: flex-end;
+    padding: 12px 24px;
+  }
+}
+
+/* Special styling for Sol's signature elements */
+.sol-signature {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 14px;
+  color: var(--text-light);
+  font-style: italic;
+}
+
+/* Highlight important information */
+.highlight-box {
+  background: linear-gradient(135deg, var(--primary-warm), var(--primary-cream));
+  border: 1px solid var(--primary-sage);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+/* Success/info boxes */
+.info-box {
+  background: var(--primary-warm);
+  border-left: 4px solid var(--primary-sage);
+  padding: 16px 20px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+}
+
+.success-box {
+  background: #E8F5E8;
+  border-left: 4px solid #4CAF50;
+  padding: 16px 20px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
 }

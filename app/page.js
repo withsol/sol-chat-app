@@ -1,3 +1,5 @@
+import ReactMarkdown from 'react-markdown'
+
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
@@ -324,45 +326,82 @@ async function processUploadedFile(file, userEmail) {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
         {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className={`max-w-3xl ${message.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800'} rounded-2xl px-6 py-4 shadow-sm border`}>
-              {message.role === 'sol' && (
-                <div className="flex items-center space-x-2 mb-2">
-                  <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
-                    S
-                  </div>
-                  <span className="text-sm font-medium text-purple-600">Sol™</span>
-                </div>
-              )}
-              <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-              {message.tags && (
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {(Array.isArray(message.tags) 
-                     ? message.tags 
-                      : message.tags.split(', ')
-                     ).map((tag, index) => (
-               <span
-                 key={index}
-                 className={`inline-block px-2 py-1 rounded-full text-xs ${
-          message.role === 'user' 
-            ? 'bg-indigo-500 text-white' 
-            : 'bg-purple-100 text-purple-700'
-        }`}
-      >
-        {tag.trim()}
-      </span>
-    ))}
-  </div>
-)}
-              <p className={`text-xs mt-2 ${message.role === 'user' ? 'text-indigo-200' : 'text-gray-500'}`}>
-                {new Date(message.timestamp).toLocaleTimeString()}
-              </p>
-            </div>
+  <div
+    key={message.id}
+    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+  >
+    <div className={`max-w-3xl ${message.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800'} rounded-2xl px-6 py-4 shadow-sm border`}>
+      {message.role === 'sol' && (
+        <div className="flex items-center space-x-2 mb-2">
+          <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+            S
           </div>
-        ))}
+          <span className="text-sm font-medium text-purple-600">Sol™</span>
+        </div>
+      )}
+      
+      {/* Updated message content rendering */}
+      {message.role === 'user' ? (
+        // User messages stay as plain text
+        <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+      ) : (
+        // Sol messages now use markdown
+        <div className="prose prose-sm max-w-none prose-headings:text-gray-800 prose-headings:font-semibold prose-p:text-gray-800 prose-p:leading-relaxed prose-strong:text-gray-900 prose-strong:font-semibold prose-em:text-gray-700 prose-em:italic prose-ul:text-gray-800 prose-ol:text-gray-800 prose-li:text-gray-800 prose-li:my-1 prose-blockquote:text-gray-700 prose-blockquote:border-l-4 prose-blockquote:border-purple-300 prose-blockquote:pl-4 prose-blockquote:italic prose-a:text-blue-600 prose-a:hover:text-blue-800 prose-a:underline">
+          <ReactMarkdown
+            components={{
+              h1: ({children}) => <h1 className="text-xl font-semibold text-gray-800 mb-3">{children}</h1>,
+              h2: ({children}) => <h2 className="text-lg font-semibold text-gray-800 mb-2">{children}</h2>,
+              h3: ({children}) => <h3 className="text-base font-semibold text-gray-800 mb-2">{children}</h3>,
+              p: ({children}) => <p className="text-gray-800 leading-relaxed mb-2">{children}</p>,
+              strong: ({children}) => <strong className="font-semibold text-gray-900">{children}</strong>,
+              em: ({children}) => <em className="italic text-gray-700">{children}</em>,
+              ul: ({children}) => <ul className="list-disc list-outside ml-4 mb-2 text-gray-800">{children}</ul>,
+              ol: ({children}) => <ol className="list-decimal list-outside ml-4 mb-2 text-gray-800">{children}</ol>,
+              li: ({children}) => <li className="text-gray-800 my-1">{children}</li>,
+              a: ({href, children}) => (
+                <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">
+                  {children}
+                </a>
+              ),
+              blockquote: ({children}) => (
+                <blockquote className="border-l-4 border-purple-300 pl-4 italic text-gray-700 mb-2">
+                  {children}
+                </blockquote>
+              ),
+              code: ({children}) => <code className="bg-gray-100 px-1 py-0.5 rounded text-sm">{children}</code>,
+              pre: ({children}) => <pre className="bg-gray-100 p-3 rounded text-sm overflow-x-auto mb-2">{children}</pre>,
+            }}
+          >
+            {message.content}
+          </ReactMarkdown>
+        </div>
+      )}
+      
+      {message.tags && (
+        <div className="mt-3 flex flex-wrap gap-1">
+          {(Array.isArray(message.tags) 
+             ? message.tags 
+              : message.tags.split(', ')
+             ).map((tag, index) => (
+         <span
+           key={index}
+           className={`inline-block px-2 py-1 rounded-full text-xs ${
+      message.role === 'user' 
+        ? 'bg-indigo-500 text-white' 
+        : 'bg-purple-100 text-purple-700'
+    }`}
+  >
+    {tag.trim()}
+  </span>
+))}
+</div>
+)}
+      <p className={`text-xs mt-2 ${message.role === 'user' ? 'text-indigo-200' : 'text-gray-500'}`}>
+        {new Date(message.timestamp).toLocaleTimeString()}
+      </p>
+    </div>
+  </div>
+))}
         
         {isTyping && (
           <div className="flex justify-start">

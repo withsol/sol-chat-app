@@ -545,6 +545,20 @@ RESPONSE GUIDELINES:
 
 Remember: You have access to their complete journey when context is available. Use that knowledge to provide deeply personalized support that generic AI cannot offer.`
 
+systemPrompt += `
+
+RESPONSE FORMATTING:
+- Use **bold** for emphasis and important points
+- Use *italics* for emotional nuance and gentle emphasis  
+- Use bullet points (- or *) for lists and action steps
+- Use ## for section headers when appropriate
+- Use > for important quotes or insights
+- Use [text](url) for clickable links
+- Use line breaks for better readability
+
+Make your responses visually scannable and easy to read. Format your responses to feel warm and personal while being easy to scan.
+
+`
   return systemPrompt
 }
 
