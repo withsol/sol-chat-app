@@ -458,13 +458,6 @@ async function updateUserProfile(email, updates) {
 
 async function createPersonalgorithmEntryNew(email, notes, tags = ['auto-generated']) {
   try {
-    // Get user record ID for linking to Personalgorithm table
-    const userRecordId = await getUserRecordId(email)
-    if (!userRecordId) {
-      console.error('Cannot create Personalgorithm entry - user record not found')
-      return null
-    }
-
     const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™`, {
@@ -476,7 +469,7 @@ async function createPersonalgorithmEntryNew(email, notes, tags = ['auto-generat
       body: JSON.stringify({
         fields: {
           'Personalgorithm™ ID': personalgorithmId,
-          'User': [userRecordId], // Link to user record
+          'User': email, // FIXED: Use email directly since Personalgorithm User field is text, not linked
           'Personalgorithm™ Notes': notes,
           'Date created': new Date().toISOString(),
           'Tags': Array.isArray(tags) ? tags.join(', ') : tags
