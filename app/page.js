@@ -47,7 +47,6 @@ export default function SolApp() {
 
       const userData = JSON.parse(storedUser)
       
-      // Verify subscription is still active
       const response = await fetch('/api/auth/thrivecart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,14 +58,13 @@ export default function SolApp() {
       if (result.hasActiveSubscription) {
         setUser({
           email: userData.email,
-          name: userData.email.split('@')[0], // Use email prefix as display name
-          personalgorithm: 'building', // Will be updated as patterns emerge
+          name: userData.email.split('@')[0],
+          personalgorithm: 'building',
           subscription: 'active'
         })
         setIsAuthenticated(true)
         testConnections()
       } else {
-        // Subscription no longer active
         localStorage.removeItem('sol_user')
         router.push('/login')
       }
@@ -157,6 +155,13 @@ export default function SolApp() {
     }
   }
 
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
+
   const handleFileUpload = async (event) => {
     const file = event.target.files[0]
     if (!file) return
@@ -171,87 +176,9 @@ export default function SolApp() {
     }
     
     setMessages(prev => [...prev, fileMessage])
-    
-    // Show processing message
-    const processingMessage = {
-      id: `processing_${Date.now()}`,
-      role: 'sol',
-      content: `I'm reading and processing "${file.name}"... This may take a moment.`,
-      timestamp: new Date().toISOString(),
-      tags: ['file-processing']
-    }
-    
-    setMessages(prev => [...prev, processingMessage])
-
-    try {
-      // Read and process the file
-      const result = await processUploadedFile(file, user.email)
-      
-      // Remove processing message and add success message
-      setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id))
-      
-      const successMessage = {
-        id: `success_${Date.now()}`,
-        role: 'sol',
-        content: result.message,
-        timestamp: new Date().toISOString(),
-        tags: ['file-processed']
-      }
-      
-      setMessages(prev => [...prev, successMessage])
-      
-    } catch (error) {
-      console.error('File processing error:', error)
-      
-      // Remove processing message and add error message
-      setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id))
-      
-      const errorMessage = {
-        id: `error_${Date.now()}`,
-        role: 'sol',
-        content: `I had trouble processing "${file.name}". Could you try copying and pasting the text content directly instead?`,
-        timestamp: new Date().toISOString(),
-        tags: ['file-error']
-      }
-      
-      setMessages(prev => [...prev, errorMessage])
-    }
   }
 
-  // Add this new function right after the handleFileUpload function:
-  async function processUploadedFile(file, userEmail) {
-    try {
-      // Create FormData to send file
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('email', userEmail)
-      
-      const response = await fetch('/api/process-file', {
-        method: 'POST',
-        body: formData
-      })
-      
-      if (!response.ok) {
-        throw new Error(`Processing failed: ${response.status}`)
-      }
-      
-      const result = await response.json()
-      return result
-      
-    } catch (error) {
-      console.error('Error processing file:', error)
-      throw error
-    }
-  }
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
-    }
-  }
-
-  // Simple markdown parser for key formatting
+  // Simple formatting function
   const formatMessage = (content) => {
     const lines = content.split('\n')
     
@@ -259,9 +186,9 @@ export default function SolApp() {
       // Handle bullet points
       if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
         return (
-          <div key={index} className="flex items-start space-x-3 mb-2">
-            <span className="text-slate-600 mt-1 text-sm">•</span>
-            <span className="text-slate-700">{line.replace(/^[•-]\s*/, '')}</span>
+          <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '8px' }}>
+            <span style={{ color: '#64748b', marginTop: '4px', fontSize: '14px' }}>•</span>
+            <span style={{ color: '#334155' }}>{line.replace(/^[•-]\s*/, '')}</span>
           </div>
         )
       }
@@ -270,9 +197,9 @@ export default function SolApp() {
       if (line.includes('**')) {
         const parts = line.split('**')
         return (
-          <p key={index} className="mb-3 text-slate-700">
+          <p key={index} style={{ marginBottom: '12px', color: '#334155' }}>
             {parts.map((part, i) => 
-              i % 2 === 1 ? <strong key={i} className="font-medium text-slate-800">{part}</strong> : part
+              i % 2 === 1 ? <strong key={i} style={{ fontWeight: '500', color: '#1e293b' }}>{part}</strong> : part
             )}
           </p>
         )
@@ -280,51 +207,104 @@ export default function SolApp() {
       
       // Regular paragraphs
       if (line.trim()) {
-        return <p key={index} className="mb-3 text-slate-700 leading-relaxed">{line}</p>
+        return <p key={index} style={{ marginBottom: '12px', color: '#334155', lineHeight: '1.6' }}>{line}</p>
       }
       
-      // Empty lines
-      return <div key={index} className="mb-2"></div>
+      return <div key={index} style={{ marginBottom: '8px' }}></div>
     })
   }
 
-  // Show loading state while checking authentication
   if (!isAuthenticated) {
     return (
-      <div className="flex items-center justify-center min-h-screen" style={{
+      <div style={{
+        display: 'flex',
+        alignItems: 'center', 
+        justifyContent: 'center',
+        minHeight: '100vh',
         background: 'linear-gradient(135deg, #f4f2f0 0%, #f1f0f6 35%, #eef4f2 70%, #f3f1f0 100%)'
       }}>
-        <div className="text-center">
-          <div className="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4 animate-pulse">
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            backgroundColor: '#475569',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: '24px',
+            margin: '0 auto 16px auto'
+          }}>
             ✷
           </div>
-          <p className="text-slate-600">Verifying your access...</p>
+          <p style={{ color: '#64748b' }}>Verifying your access...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-screen" style={{
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100vh',
       background: 'linear-gradient(135deg, #f4f2f0 0%, #f1f0f6 35%, #eef4f2 70%, #f3f1f0 100%)'
     }}>
+      
       {/* Header */}
-      <div className="backdrop-blur-sm border-b border-white/20 px-8 py-6 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 bg-slate-700 rounded-full flex items-center justify-center shadow-md">
-            <span className="text-white text-lg">✷</span>
+      <div style={{
+        backdropFilter: 'blur(8px)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+        padding: '24px 32px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            backgroundColor: '#475569',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: '18px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          }}>
+            ✷
           </div>
           <div>
-            <h1 className="text-xl font-light text-slate-800 tracking-wide">Sol</h1>
-            <p className="text-sm text-slate-600 font-light">AI Business Partner</p>
+            <h1 style={{ 
+              fontSize: '20px', 
+              fontWeight: '300', 
+              color: '#1e293b', 
+              letterSpacing: '0.025em',
+              margin: 0
+            }}>Sol</h1>
+            <p style={{ 
+              fontSize: '14px', 
+              color: '#64748b', 
+              fontWeight: '300',
+              margin: 0
+            }}>AI Business Partner</p>
           </div>
         </div>
         
-        <div className="flex items-center space-x-6">
-          <div className="flex items-center space-x-2">
-            {connectionStatus === 'connected' && <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>}
-            {connectionStatus === 'error' && <AlertCircle className="w-4 h-4 text-red-500" />}
-            <span className="text-xs text-slate-600 tracking-wide font-light">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {connectionStatus === 'connected' && (
+              <div style={{
+                width: '8px',
+                height: '8px',
+                backgroundColor: '#10b981',
+                borderRadius: '50%'
+              }}></div>
+            )}
+            {connectionStatus === 'error' && <AlertCircle style={{ width: '16px', height: '16px', color: '#ef4444' }} />}
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: '300', letterSpacing: '0.025em' }}>
               {connectionStatus === 'connected' ? 'Connected to Lore' : 
                connectionStatus === 'error' ? 'Connection Issue' : 'Connecting...'}
             </span>
@@ -332,34 +312,62 @@ export default function SolApp() {
           
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="p-3 hover:bg-white/30 rounded-xl transition-colors"
+            style={{
+              padding: '12px',
+              backgroundColor: 'rgba(255, 255, 255, 0.3)',
+              border: 'none',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            }}
           >
-            <Settings className="w-4 h-4 text-slate-600" />
+            <Settings style={{ width: '16px', height: '16px', color: '#64748b' }} />
           </button>
           
-          <div className="flex items-center space-x-3 text-sm text-slate-700 bg-white/30 px-4 py-2 rounded-xl backdrop-blur-sm">
-            <User className="w-4 h-4" />
-            <span className="font-light">{user?.name}</span>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            fontSize: '14px',
+            color: '#334155',
+            backgroundColor: 'rgba(255, 255, 255, 0.3)',
+            padding: '8px 16px',
+            borderRadius: '12px',
+            backdropFilter: 'blur(8px)'
+          }}>
+            <User style={{ width: '16px', height: '16px' }} />
+            <span style={{ fontWeight: '300' }}>{user?.name}</span>
           </div>
           
           <button
             onClick={handleLogout}
-            className="p-2 hover:bg-white/30 rounded-full transition-colors"
+            style={{
+              padding: '8px',
+              backgroundColor: 'rgba(255, 255, 255, 0.3)',
+              border: 'none',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            }}
             title="Logout"
           >
-            <LogOut className="w-4 h-4 text-slate-600" />
+            <LogOut style={{ width: '16px', height: '16px', color: '#64748b' }} />
           </button>
         </div>
       </div>
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="backdrop-blur-sm border-b border-white/20 px-8 py-5">
-          <div className="text-sm text-slate-700 font-light space-y-2">
-            <p><span className="font-medium text-slate-800">User:</span> {user?.email}</p>
-            <p><span className="font-medium text-slate-800">Personalgorithm™:</span> {user?.personalgorithm}</p>
-            <p><span className="font-medium text-slate-800">Subscription:</span> {user?.subscription}</p>
-            <p className="text-xs text-slate-600 mt-4 leading-relaxed">
+        <div style={{
+          backdropFilter: 'blur(8px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+          padding: '20px 32px'
+        }}>
+          <div style={{ fontSize: '14px', color: '#334155', fontWeight: '300', lineHeight: '1.5' }}>
+            <p style={{ margin: '0 0 8px 0' }}><span style={{ fontWeight: '500', color: '#1e293b' }}>User:</span> {user?.email}</p>
+            <p style={{ margin: '0 0 8px 0' }}><span style={{ fontWeight: '500', color: '#1e293b' }}>Personalgorithm™:</span> {user?.personalgorithm}</p>
+            <p style={{ margin: '0 0 16px 0' }}><span style={{ fontWeight: '500', color: '#1e293b' }}>Subscription:</span> {user?.subscription}</p>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: 0, lineHeight: '1.5' }}>
               All conversations contribute to your personalized business intelligence and growth patterns.
             </p>
           </div>
@@ -367,73 +375,134 @@ export default function SolApp() {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-8 py-8 space-y-6">
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: '32px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '24px'
+      }}>
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            style={{
+              display: 'flex',
+              justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start'
+            }}
           >
-            <div className={`max-w-2xl ${
-              message.role === 'user' 
-                ? 'bg-slate-700 text-white shadow-lg' 
-                : ''
-            } rounded-3xl px-7 py-6`}>
+            <div style={{
+              maxWidth: '512px',
+              backgroundColor: message.role === 'user' ? '#475569' : 'transparent',
+              color: message.role === 'user' ? 'white' : '#334155',
+              borderRadius: '24px',
+              padding: '28px',
+              boxShadow: message.role === 'user' ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : 'none'
+            }}>
               
               {message.role === 'sol' && (
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center">
-                    <span className="text-white text-xs">✷</span>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '16px'
+                }}>
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    backgroundColor: '#475569',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: '12px'
+                  }}>
+                    ✷
                   </div>
-                  <span className="text-sm font-medium text-slate-800 tracking-wide">Sol</span>
+                  <span style={{
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#1e293b',
+                    letterSpacing: '0.025em'
+                  }}>Sol</span>
                 </div>
               )}
               
-              <div className={`${message.role === 'user' ? 'text-white' : 'text-slate-700'} leading-relaxed font-light`}>
+              <div style={{
+                lineHeight: '1.6',
+                fontWeight: '300'
+              }}>
                 {message.role === 'sol' ? formatMessage(message.content) : message.content}
               </div>
               
-              {message.tags && (
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {(Array.isArray(message.tags) 
-                     ? message.tags 
-                      : message.tags.split(', ')
-                     ).map((tag, index) => (
-                 <span
-                   key={index}
-                   className={`inline-block px-2 py-1 rounded-full text-xs ${
-              message.role === 'user' 
-                ? 'bg-slate-600 text-white' 
-                : 'bg-slate-100 text-slate-600'
-            }`}
-          >
-            {tag.trim()}
-          </span>
-        ))}
-      </div>
-    )}
-              
-              <div className={`text-xs mt-4 ${
-                message.role === 'user' ? 'text-white/70' : 'text-slate-500'
-              } font-light`}>
-                {new Date(message.timestamp).toLocaleTimeString()}
+              <div style={{
+                fontSize: '12px',
+                marginTop: '16px',
+                color: message.role === 'user' ? 'rgba(255, 255, 255, 0.7)' : '#94a3b8',
+                fontWeight: '300'
+              }}>
+                {new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
               </div>
             </div>
           </div>
         ))}
         
         {isTyping && (
-          <div className="flex justify-start">
-            <div className="rounded-3xl px-7 py-6 max-w-2xl">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs">✷</span>
+          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+            <div style={{
+              borderRadius: '24px',
+              padding: '28px',
+              maxWidth: '512px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '16px'
+              }}>
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  backgroundColor: '#475569',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '12px'
+                }}>
+                  ✷
                 </div>
-                <span className="text-sm font-medium text-slate-800 tracking-wide">Sol is thinking...</span>
+                <span style={{
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#1e293b',
+                  letterSpacing: '0.025em'
+                }}>Sol is thinking</span>
               </div>
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <div style={{
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: '#94a3b8',
+                  borderRadius: '50%',
+                  animation: 'bounce 1s infinite'
+                }}></div>
+                <div style={{
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: '#94a3b8',
+                  borderRadius: '50%',
+                  animation: 'bounce 1s infinite 0.1s'
+                }}></div>
+                <div style={{
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: '#94a3b8',
+                  borderRadius: '50%',
+                  animation: 'bounce 1s infinite 0.2s'
+                }}></div>
               </div>
             </div>
           </div>
@@ -442,50 +511,94 @@ export default function SolApp() {
       </div>
 
       {/* Message Input */}
-      <div className="px-8 py-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-end space-x-4">
-            <div className="flex-1 relative">
+      <div style={{ padding: '32px' }}>
+        <div style={{ maxWidth: '1024px', margin: '0 auto' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: '16px'
+          }}>
+            <div style={{ flex: 1, position: 'relative' }}>
               <textarea
                 value={currentMessage}
                 onChange={(e) => setCurrentMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Share what's on your mind, ask a question, or just check in..."
-                className="w-full p-5 border border-white/30 rounded-2xl focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-transparent resize-none min-h-[60px] max-h-32 font-light text-slate-700 placeholder-slate-500 bg-white/40 backdrop-blur-sm"
+                style={{
+                  width: '100%',
+                  padding: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '16px',
+                  outline: 'none',
+                  resize: 'none',
+                  minHeight: '60px',
+                  maxHeight: '128px',
+                  fontWeight: '300',
+                  color: '#334155',
+                  backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                  backdropFilter: 'blur(8px)',
+                  fontSize: '16px',
+                  lineHeight: '1.5'
+                }}
                 rows={1}
                 disabled={isTyping}
               />
             </div>
             
-            <div className="flex space-x-3">
+            <div style={{ display: 'flex', gap: '12px' }}>
               <input
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileUpload}
-                className="hidden"
+                style={{ display: 'none' }}
                 accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.mp3,.wav,.m4a"
               />
               
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="p-4 text-slate-600 hover:text-slate-700 hover:bg-white/30 rounded-xl transition-colors"
+                style={{
+                  padding: '16px',
+                  color: '#64748b',
+                  backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
                 title="Upload file"
                 disabled={isTyping}
               >
-                <Upload className="w-5 h-5" />
+                <Upload style={{ width: '20px', height: '20px' }} />
               </button>
               
               <button
                 onClick={handleSendMessage}
                 disabled={!currentMessage.trim() || isTyping}
-                className="p-4 bg-slate-700 text-white rounded-xl hover:bg-slate-800 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                style={{
+                  padding: '16px',
+                  backgroundColor: '#475569',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: !currentMessage.trim() || isTyping ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                  transition: 'all 0.2s',
+                  opacity: !currentMessage.trim() || isTyping ? 0.5 : 1
+                }}
               >
-                <Send className="w-5 h-5" />
+                <Send style={{ width: '20px', height: '20px' }} />
               </button>
             </div>
           </div>
           
-          <div className="mt-4 text-xs text-slate-600 text-center font-light tracking-wide">
+          <div style={{
+            marginTop: '16px',
+            fontSize: '12px',
+            color: '#64748b',
+            textAlign: 'center',
+            fontWeight: '300',
+            letterSpacing: '0.025em'
+          }}>
             Everything you share builds your Personalgorithm™ • Powered by your Lore™ memory database
           </div>
         </div>
