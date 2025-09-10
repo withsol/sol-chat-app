@@ -42,9 +42,7 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
   try {
     const message = userMessage.toLowerCase()
     
-    // *** FIXED: More aggressive visioning content detection ***
     const hasVisioningContent = userMessage.length > 400 && (
-      // Section headers from visioning homework
       message.includes('section one') ||
       message.includes('section two') ||
       message.includes('section three') ||
@@ -57,19 +55,16 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
       message.includes('core values') ||
       message.includes('ideal audience member') ||
       message.includes('what differentiates you') ||
-      // Document sharing phrases
       message.includes('here is my visioning') ||
       message.includes('here\'s my visioning') ||
       message.includes('my visioning homework') ||
       message.includes('completed visioning') ||
       message.includes('visioning document') ||
-      // Multiple business-related keywords in long text
       (userMessage.length > 800 && 
         (message.includes('business') && message.includes('goals') && message.includes('client'))
       )
     )
     
-    // *** FIXED: More aggressive business plan detection ***
     const hasBusinessPlanContent = userMessage.length > 400 && (
       message.includes('future vision') ||
       message.includes('top 3 goals') ||
@@ -78,12 +73,10 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
       message.includes('sales system') ||
       message.includes('aligned business plan') ||
       message.includes('business plan') ||
-      // Document sharing phrases
       message.includes('here is my business plan') ||
       message.includes('here\'s my business plan') ||
       message.includes('my business plan') ||
       message.includes('completed business plan') ||
-      // Multiple business plan keywords
       (userMessage.length > 600 && 
         (message.includes('vision') && message.includes('goals') && message.includes('offers'))
       )
@@ -91,11 +84,16 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
     
     if (hasVisioningContent) {
       console.log('🎯 Detected visioning content, processing...')
-      console.log('Message length:', userMessage.length)
-      console.log('Sample content:', userMessage.substring(0, 200))
       
       try {
-        const response = await fetch('/api/process-visioning', {
+        // FIXED: Use the correct Vercel URL construction
+        const baseUrl = process.env.VERCEL_URL 
+          ? `https://${process.env.VERCEL_URL}` 
+          : (process.env.NEXT_PUBLIC_APP_URL || 'https://sol-chat-app.vercel.app')
+        
+        console.log('🎯 Using base URL:', baseUrl)
+        
+        const response = await fetch(`${baseUrl}/api/process-visioning`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -104,11 +102,11 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
           })
         })
         
-        console.log('Visioning API response status:', response.status)
+        console.log('🎯 API response status:', response.status)
         
         if (response.ok) {
           const result = await response.json()
-          console.log('Visioning processing result:', result)
+          console.log('🎯 SUCCESS - Visioning processing result:', result)
           
           return {
             content: `🎯 Incredible! I've processed your visioning homework and extracted ${result.personalgorithmCount || 0} Personalgorithm™ insights about how you work best. 
@@ -120,7 +118,7 @@ What feels most important to focus on first from everything you've shared?`,
           }
         } else {
           const errorText = await response.text()
-          console.error('Visioning processing failed:', response.status, errorText)
+          console.error('🔍 API ERROR Response:', errorText)
           
           return {
             content: `I can see you're sharing your visioning homework with me! I'm processing the insights you've shared. Based on what I can see about your business vision and goals, what's the most important thing you want to focus on right now?`,
@@ -128,7 +126,7 @@ What feels most important to focus on first from everything you've shared?`,
           }
         }
       } catch (error) {
-        console.error('Visioning processing error:', error)
+        console.error('🔍 FETCH ERROR:', error)
         return {
           content: `Thank you for sharing your comprehensive visioning work! I can see the depth of thought you've put into this. What's the main area you'd like my support with based on everything you've shared?`,
           hasVisioningGuidance: true
@@ -138,11 +136,8 @@ What feels most important to focus on first from everything you've shared?`,
     
     if (hasBusinessPlanContent) {
       console.log('💼 Detected business plan content, processing...')
-      console.log('Message length:', userMessage.length)
-      console.log('Sample content:', userMessage.substring(0, 200))
       
       try {
-        // Extract basic business plan data
         const businessPlanData = {
           futureVision: extractSection(userMessage, ['future vision', 'vision']),
           topGoals: extractSection(userMessage, ['top 3 goals', 'goals']),
@@ -153,7 +148,12 @@ What feels most important to focus on first from everything you've shared?`,
           salesSystem: extractSection(userMessage, ['sales system', 'sales'])
         }
         
-        const response = await fetch('/api/process-business-plan', {
+        // FIXED: Use the correct Vercel URL construction
+        const baseUrl = process.env.VERCEL_URL 
+          ? `https://${process.env.VERCEL_URL}` 
+          : (process.env.NEXT_PUBLIC_APP_URL || 'https://sol-chat-app.vercel.app')
+        
+        const response = await fetch(`${baseUrl}/api/process-business-plan`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -162,12 +162,8 @@ What feels most important to focus on first from everything you've shared?`,
           })
         })
         
-        console.log('Business plan API response status:', response.status)
-        
         if (response.ok) {
           const result = await response.json()
-          console.log('Business plan processing result:', result)
-          
           return {
             content: `💼 Excellent! I've processed your Aligned Business Plan and added the strategic insights to your Personalgorithm™. I can see your business vision and goals clearly now.
 
@@ -185,32 +181,32 @@ Based on your plan, what's the most important focus area for the next 30 days?`,
       }
     }
     
-    // *** FIXED: Only show options if they specifically ask for visioning help ***
+    // Show options only for explicit requests
     const needsVisioningHelp = !userContextData.visioningData && (
       message.includes('help with visioning') || 
       message.includes('work on visioning') ||
       message.includes('need help with vision') ||
       message.includes('want to do visioning') ||
       message.includes('ready for visioning') ||
-      (message.includes('visioning') && message.includes('?')) // Questions about visioning
+      (message.includes('visioning') && message.includes('?'))
     )
     
     if (needsVisioningHelp) {
       return {
         content: `I'd love to help you with your visioning! Here are your options:
 
-**Option 1: Share Your Completed Visioning** - If you've already filled out comprehensive visioning homework, you can paste the text directly here and I'll extract all the insights to build your Personalgorithm™.
+**Option 1: Share Your Completed Visioning** - Paste your comprehensive visioning homework directly here.
 
-**Option 2: Work Through It Together** - I can guide you through the key visioning questions to help you clarify your business vision, ideal client, and goals.
+**Option 2: Work Through It Together** - I can guide you through the key questions.
 
-**Option 3: Use the Airtable Form** - I have a structured form: https://airtable.com/appbxBGiXlAatoYsV/pagxUmPB9uh1c9Tqz/form
+**Option 3: Use the Airtable Form** - https://airtable.com/appbxBGiXlAatoYsV/pagxUmPB9uh1c9Tqz/form
 
 Which approach feels right for you?`,
         hasVisioningGuidance: true
       }
     }
     
-    return null // Let normal chat flow continue
+    return null
     
   } catch (error) {
     console.error('Error in visioning guidance:', error)
