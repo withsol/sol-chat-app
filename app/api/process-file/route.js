@@ -28,6 +28,9 @@ export async function POST(request) {
       console.log('Processing PDF with pdf-parse...')
       
       try {
+        // Dynamic import to prevent build issues
+        const pdfParse = (await import('pdf-parse')).default
+        
         const pdfData = await pdfParse(buffer, {
           // Options for better text extraction
           normalizeWhitespace: false,
