@@ -95,7 +95,7 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
       console.log('Sample content:', userMessage.substring(0, 200))
       
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/process-visioning`, {
+        const response = await fetch('/api/process-visioning', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -153,7 +153,7 @@ What feels most important to focus on first from everything you've shared?`,
           salesSystem: extractSection(userMessage, ['sales system', 'sales'])
         }
         
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/process-business-plan`, {
+        const response = await fetch('/api/process-business-plan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -561,7 +561,7 @@ async function triggerPersonalgorithmAnalysis(email, userMessage, solResponse, c
   try {
     setTimeout(async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/analyze-message-personalgorithm`, {
+        const response = await fetch('/api/analyze-message-personalgorithm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
