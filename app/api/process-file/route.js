@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server'
-import pdf from 'pdf-parse'
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js'
 
 export async function POST(request) {
   console.log('=== FILE PROCESSING API ===')
@@ -24,23 +24,51 @@ export async function POST(request) {
     
     let extractedText = ''
     
-    // Handle different file types
-    if (file.type === 'application/pdf') {
-      console.log('Processing PDF...')
-      const pdfData = await pdf(buffer)
-      extractedText = pdfData.text
-    } else if (file.type === 'text/plain') {
-      extractedText = buffer.toString('utf-8')
-    } else if (file.name.endsWith('.docx')) {
-      // For DOCX files, you'd need mammoth.js
-      return NextResponse.json({ 
-        error: 'DOCX files not supported yet. Please convert to PDF or paste text directly.' 
-      }, { status: 400 })
-    } else {
-      return NextResponse.json({ 
-        error: 'Unsupported file type. Please upload PDF or text files.' 
-      }, { status: 400 })
+   // Handle different file types
+if (file.type === 'application/pdf') {
+  console.log('Processing PDF with pdfjs-dist...')
+  
+  try {
+    // Load the PDF document
+    const loadingTask = pdfjsLib.getDocument({
+      data: new Uint8Array(buffer),
+      useSystemFonts: true
+    })
+    
+    const pdfDocument = await loadingTask.promise
+    console.log('PDF loaded, pages:', pdfDocument.numPages)
+    
+    let fullText = ''
+    
+    // Extract text from each page
+    for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+      const page = await pdfDocument.getPage(pageNum)
+      const textContent = await page.getTextContent()
+      
+      const pageText = textContent.items
+        .map(item => ('str' in item) ? item.str : '')
+        .join(' ')
+      
+      fullText += pageText + '\n'
     }
+    
+    extractedText = fullText.trim()
+    console.log('Extracted text length:', extractedText.length)
+    
+  } catch (pdfError) {
+    console.error('PDF processing error:', pdfError)
+    return NextResponse.json({ 
+      error: 'Failed to process PDF. Please ensure it\'s a valid PDF file or try converting to text.' 
+    }, { status: 400 })
+  }
+  
+} else if (file.type === 'text/plain') {
+  extractedText = buffer.toString('utf-8')
+} else {
+  return NextResponse.json({ 
+    error: 'Unsupported file type. Please upload PDF or text files.' 
+  }, { status: 400 })
+}
 
     if (!extractedText || extractedText.trim().length === 0) {
       return NextResponse.json({ 
@@ -287,7 +315,7 @@ async function addGeneralDocumentInsight(email, filename, summary, excerpt) {
 
 function getBaseUrl(request) {
   const host = request.headers.get('host')
-  const protocol = request.headers.get('x-forwarded-proto') || 'http'
+  const protocol = request.headers.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
   return `${protocol}://${host}`
 }
 
