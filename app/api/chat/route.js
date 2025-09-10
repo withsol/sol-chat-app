@@ -309,6 +309,36 @@ export async function POST(request) {
       // Continue without logging rather than crashing
     }
 
+    async function triggerPersonalgorithmAnalysis(email, userMessage, solResponse, conversationHistory) {
+  try {
+    // Don't await this - run in background to not slow down chat response
+    setTimeout(async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/analyze-message-personalgorithm`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            userMessage,
+            solResponse,
+            conversationContext: conversationHistory.slice(-3)
+          })
+        })
+        
+        if (response.ok) {
+          const result = await response.json()
+          console.log('🧠 Personalgorithm™ analysis completed:', result.entriesCreated, 'new insights')
+        }
+      } catch (error) {
+        console.error('Background Personalgorithm™ analysis failed:', error)
+      }
+    }, 1000) // 1 second delay to not impact chat response time
+
+  } catch (error) {
+    console.error('Error triggering Personalgorithm™ analysis:', error)
+  }
+}
+
     // *** NEW: SOL AUTO-UPDATE SYSTEM ***
     // Only run if we got a real AI response (not fallback)
     if (aiResponse.content && !aiResponse.content.includes('technical difficulties')) {
