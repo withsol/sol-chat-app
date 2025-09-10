@@ -381,23 +381,31 @@ export default function SolApp() {
         padding: '32px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '24px'
+        gap: '24px',
+        alignItems: 'center' // Center all messages
       }}>
         {messages.map((message) => (
           <div
             key={message.id}
             style={{
               display: 'flex',
-              justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start'
+              justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
+              width: '100%',
+              maxWidth: '800px' // Constrain the width but center the container
             }}
           >
             <div style={{
-              maxWidth: '600px',
-              backgroundColor: message.role === 'user' ? 'linear-gradient(135deg, #f8f7ff 0%, #f3f0ff 50%, #faf8ff 100%)' : 'transparent',
-              color: message.role === 'user' ? 'white' : '#334155',
+              maxWidth: '600px', // Slightly wider for better readability
+              backgroundColor: message.role === 'user' 
+                ? 'linear-gradient(135deg, #f8f7ff 0%, #f3f0ff 50%, #faf8ff 100%)' 
+                : 'transparent',
+              color: message.role === 'user' ? '#475569' : '#334155', // Changed user text color
               borderRadius: '24px',
               padding: '28px',
-              boxShadow: message.role === 'user' ? '0 10px 15px -3px rgba(0, 0, 0, 0.1)' : 'none'
+              boxShadow: message.role === 'user' ? '0 2px 8px rgba(139, 92, 246, 0.1)' : 'none',
+              background: message.role === 'user' 
+                ? 'linear-gradient(135deg, #f8f7ff 0%, #f3f0ff 50%, #faf8ff 100%)' 
+                : 'transparent'
             }}>
               
               {message.role === 'sol' && (
@@ -439,7 +447,7 @@ export default function SolApp() {
               <div style={{
                 fontSize: '12px',
                 marginTop: '16px',
-                color: message.role === 'user' ? 'rgba(255, 255, 255, 0.7)' : '#94a3b8',
+                color: message.role === 'user' ? '#7c7c8a' : '#94a3b8', // Muted gray-lavender for user timestamp
                 fontWeight: '300'
               }}>
                 {new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -449,11 +457,16 @@ export default function SolApp() {
         ))}
         
         {isTyping && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'flex-start',
+            width: '100%',
+            maxWidth: '800px'
+          }}>
             <div style={{
               borderRadius: '24px',
               padding: '28px',
-              maxWidth: '512px'
+              maxWidth: '600px'
             }}>
               <div style={{
                 display: 'flex',
@@ -523,7 +536,7 @@ export default function SolApp() {
                 value={currentMessage}
                 onChange={(e) => setCurrentMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="What's coming up for you today?"
+                placeholder="Share what's on your mind, ask a question, or just check in..."
                 style={{
                   width: '100%',
                   padding: '16px 20px',
@@ -533,14 +546,14 @@ export default function SolApp() {
                   resize: 'none',
                   minHeight: '52px',
                   maxHeight: '120px',
-                  fontWeight: '300',
-                  color: '#717f95ff',
-                  background: 'linear-gradient(135deg, #f8f7ff 0%, #f3f0ff 50%, #faf8ff 100%)',
+                  fontWeight: '400',
+                  color: '#2d3748',
+                  background: '#fefefe', // Light off-white background
                   fontSize: '16px',
                   lineHeight: '1.5',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                   transition: 'all 0.2s ease',
-                  boxShadow: '0 2px 8px rgba(139, 92, 246, 0.1)'
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
                 }}
                 rows={1}
                 disabled={isTyping}
@@ -551,7 +564,12 @@ export default function SolApp() {
               />
             </div>
             
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ 
+              display: 'flex', 
+              gap: '12px',
+              alignItems: 'flex-end', // Better alignment with textarea
+              paddingBottom: '2px' // Fine-tune alignment
+            }}>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -563,13 +581,18 @@ export default function SolApp() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 style={{
-                  padding: '14px',
-                  color: '#8d9db3ff',
+                  padding: '15px', // Slightly larger to match textarea height
+                  color: '#64748b',
                   backgroundColor: 'rgba(255, 255, 255, 0.3)',
                   border: 'none',
                   borderRadius: '10px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  height: '52px', // Match textarea min-height
+                  width: '52px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
                 title="Upload file"
                 disabled={isTyping}
@@ -581,15 +604,20 @@ export default function SolApp() {
                 onClick={handleSendMessage}
                 disabled={!currentMessage.trim() || isTyping}
                 style={{
-                  padding: '14px',
-                  backgroundColor: '#305468ff',
+                  padding: '15px',
+                  backgroundColor: '#475569',
                   color: 'white',
                   border: 'none',
                   borderRadius: '10px',
                   cursor: !currentMessage.trim() || isTyping ? 'not-allowed' : 'pointer',
                   boxShadow: '0 4px 12px rgba(71, 85, 105, 0.3)',
                   transition: 'all 0.2s',
-                  opacity: !currentMessage.trim() || isTyping ? 0.5 : 1
+                  opacity: !currentMessage.trim() || isTyping ? 0.5 : 1,
+                  height: '52px', // Match textarea min-height
+                  width: '52px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
                 <Send style={{ width: '20px', height: '20px' }} />
@@ -602,7 +630,7 @@ export default function SolApp() {
             fontSize: '12px',
             color: '#64748b',
             textAlign: 'center',
-            fontWeight: '400',
+            fontWeight: '300',
             letterSpacing: '0.025em'
           }}>
             Everything you share builds your Personalgorithm™ • Powered by your Lore™ memory database
