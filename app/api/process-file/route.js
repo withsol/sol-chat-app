@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import pdfParse from 'pdf-parse'
 
 export async function POST(request) {
   console.log('=== FILE PROCESSING API ===')
@@ -24,68 +25,27 @@ export async function POST(request) {
     
     // Handle different file types
     if (file.type === 'application/pdf') {
-      console.log('Processing PDF with pdfjs-dist v5...')
+      console.log('Processing PDF with pdf-parse...')
       
       try {
-        // Updated import for pdfjs-dist v5.x
-        const pdfjsLib = await import('pdfjs-dist')
-        
-        // For v5.x, worker configuration is different
-        if (typeof window === 'undefined') {
-          // Disable worker in server environment
-          pdfjsLib.GlobalWorkerOptions.workerSrc = false
-        }
-        
-        // Load the PDF document with v5.x compatible options
-        const loadingTask = pdfjsLib.getDocument({
-          data: new Uint8Array(buffer),
-          useSystemFonts: true,
-          disableFontFace: true,
-          useWorkerFetch: false,
-          isEvalSupported: false,
-          disableCreateObjectURL: true,
-          // v5.x specific options
-          verbosity: 0 // Suppress console warnings
+        const pdfData = await pdfParse(buffer, {
+          // Options for better text extraction
+          normalizeWhitespace: false,
+          disableCombineTextItems: false
         })
-    
-        const pdfDocument = await loadingTask.promise
-        console.log('PDF loaded, pages:', pdfDocument.numPages)
         
-        let fullText = ''
-        
-        // Extract text from each page
-        for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-          try {
-            const page = await pdfDocument.getPage(pageNum)
-            const textContent = await page.getTextContent()
-            
-            const pageText = textContent.items
-              .map(item => {
-                // Handle different item types in v5.x
-                if (item && typeof item === 'object' && 'str' in item) {
-                  return item.str
-                }
-                return ''
-              })
-              .join(' ')
-            
-            fullText += pageText + '\n'
-          } catch (pageError) {
-            console.warn(`Error processing page ${pageNum}:`, pageError)
-            // Continue with other pages
-          }
-        }
-        
-        extractedText = fullText.trim()
-        console.log('Extracted text length:', extractedText.length)
-        
-        // Clean up
-        await pdfDocument.destroy()
+        extractedText = pdfData.text
+        console.log('PDF extraction successful:', {
+          pages: pdfData.numpages,
+          textLength: extractedText.length,
+          info: pdfData.info?.Title || 'No title'
+        })
         
       } catch (pdfError) {
         console.error('PDF processing error:', pdfError)
         return NextResponse.json({ 
-          error: 'Failed to process PDF. Please ensure it\'s a valid PDF file or try converting to text.' 
+          error: 'Failed to process PDF. The file may be corrupted or password-protected. Please try converting to text or copying the content directly.',
+          details: pdfError.message
         }, { status: 400 })
       }
   
@@ -99,11 +59,11 @@ export async function POST(request) {
 
     if (!extractedText || extractedText.trim().length === 0) {
       return NextResponse.json({ 
-        error: 'Could not extract text from file. Please try copying and pasting the content directly.' 
+        error: 'Could not extract text from file. The PDF may be image-based or empty. Please try copying and pasting the content directly.' 
       }, { status: 400 })
     }
 
-    console.log('Extracted text length:', extractedText.length)
+    console.log('Text extraction successful, length:', extractedText.length)
 
     // Analyze document type and route to appropriate processor
     const documentType = analyzeDocumentType(extractedText, file.name)
@@ -113,66 +73,94 @@ export async function POST(request) {
     
     if (documentType === 'visioning') {
       // Process as visioning document
-      const response = await fetch(`${getBaseUrl(request)}/api/process-visioning`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email,
-          visioningText: extractedText
+      try {
+        const response = await fetch(`${getBaseUrl(request)}/api/process-visioning`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email,
+            visioningText: extractedText
+          })
         })
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to process visioning document')
+        
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('Process visioning failed:', response.status, errorText)
+          throw new Error(`Visioning processing failed: ${response.status}`)
+        }
+        
+        result = await response.json()
+        
+        return NextResponse.json({
+          success: true,
+          type: 'visioning',
+          message: `🎯 Visioning homework processed successfully! I've extracted your business vision, goals, ideal client details, and created ${result.personalgorithmCount || 0} Personalgorithm™ insights. Your profile has been updated with your vision and I can now coach you with much more personalized support.`,
+          ...result
+        })
+      } catch (visioningError) {
+        console.error('Visioning processing error:', visioningError)
+        return NextResponse.json({
+          error: 'Failed to process visioning document',
+          details: visioningError.message
+        }, { status: 500 })
       }
-      
-      result = await response.json()
-      
-      return NextResponse.json({
-        success: true,
-        type: 'visioning',
-        message: `🎯 Visioning homework processed successfully! I've extracted your business vision, goals, ideal client details, and created ${result.personalgorithmCount || 0} Personalgorithm™ insights. Your profile has been updated with your vision and I can now coach you with much more personalized support.`,
-        ...result
-      })
       
     } else if (documentType === 'business-plan') {
       // Process as business plan
-      const businessPlanData = extractBusinessPlanData(extractedText)
-      
-      const response = await fetch(`${getBaseUrl(request)}/api/process-business-plan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email,
-          businessPlanData: businessPlanData
+      try {
+        const businessPlanData = extractBusinessPlanData(extractedText)
+        
+        const response = await fetch(`${getBaseUrl(request)}/api/process-business-plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email,
+            businessPlanData: businessPlanData
+          })
         })
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to process business plan')
+        
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('Process business plan failed:', response.status, errorText)
+          throw new Error(`Business plan processing failed: ${response.status}`)
+        }
+        
+        result = await response.json()
+        
+        return NextResponse.json({
+          success: true,
+          type: 'business-plan',
+          message: `💼 Aligned Business Plan processed successfully! I've extracted your business vision, goals, ideal client profile, and strategic context. This has been added to your Personalgorithm™ and I can now provide much more targeted business coaching.`,
+          ...result
+        })
+      } catch (businessPlanError) {
+        console.error('Business plan processing error:', businessPlanError)
+        return NextResponse.json({
+          error: 'Failed to process business plan',
+          details: businessPlanError.message
+        }, { status: 500 })
       }
-      
-      result = await response.json()
-      
-      return NextResponse.json({
-        success: true,
-        type: 'business-plan',
-        message: `💼 Aligned Business Plan processed successfully! I've extracted your business vision, goals, ideal client profile, and strategic context. This has been added to your Personalgorithm™ and I can now provide much more targeted business coaching.`,
-        ...result
-      })
       
     } else {
       // General document - create a summary and add to Sol's knowledge
-      const summary = await createDocumentSummary(extractedText, file.name)
-      
-      // Add to user's context as a general insight
-      await addGeneralDocumentInsight(email, file.name, summary, extractedText.substring(0, 1000))
-      
-      return NextResponse.json({
-        success: true,
-        type: 'general',
-        message: `📄 Document "${file.name}" processed successfully! I've created a summary and added the key insights to your Personalgorithm™. I can now reference this information in our conversations.`
-      })
+      try {
+        const summary = await createDocumentSummary(extractedText, file.name)
+        
+        // Add to user's context as a general insight
+        await addGeneralDocumentInsight(email, file.name, summary, extractedText.substring(0, 1000))
+        
+        return NextResponse.json({
+          success: true,
+          type: 'general',
+          message: `📄 Document "${file.name}" processed successfully! I've created a summary and added the key insights to your Personalgorithm™. I can now reference this information in our conversations.`
+        })
+      } catch (generalError) {
+        console.error('General document processing error:', generalError)
+        return NextResponse.json({
+          error: 'Failed to process general document',
+          details: generalError.message
+        }, { status: 500 })
+      }
     }
 
   } catch (error) {
@@ -235,7 +223,6 @@ function analyzeDocumentType(text, filename) {
 }
 
 function extractBusinessPlanData(text) {
-  // Simple extraction for now - you can make this more sophisticated
   return {
     futureVision: extractSection(text, ['future vision', 'vision']),
     topGoals: extractSection(text, ['top 3 goals', 'goals', 'objectives']),
