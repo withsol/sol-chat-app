@@ -117,12 +117,21 @@ export async function POST(request) {
         
         // Create Personalgorithm entries from analysis
         if (analysis.personalgorithmInsights?.length > 0) {
+          console.log(`Creating ${analysis.personalgorithmInsights.length} Personalgorithm insights for ${userEmail}`)
           for (const insight of analysis.personalgorithmInsights) {
+            console.log('Creating insight:', insight.substring(0, 50) + '...')
             const personalgorithmResult = await createPersonalgorithmEntryNew(userEmail, insight, ['visioning-analysis', 'existing-data'])
             if (personalgorithmResult) {
               personalgorithmCount++
+              console.log('✅ Personalgorithm insight created successfully')
+            } else {
+              console.log('❌ Failed to create Personalgorithm insight')
             }
           }
+        } else {
+          console.log('⚠️ No personalgorithm insights found in analysis for record:', record.id)
+          console.log('Analysis object keys:', Object.keys(analysis))
+          console.log('Insights array:', analysis.personalgorithmInsights)
         }
 
         // Update the visioning record with enhanced analysis
@@ -383,6 +392,26 @@ function generateSolNotes(analysis) {
 }
 
 // ==================== HELPER FUNCTIONS ====================
+
+async function getUserEmailFromLinkedRecord(userRecordId) {
+  try {
+    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users/${userRecordId}`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (response.ok) {
+      const record = await response.json()
+      return record.fields['User ID'] // This should be the email in Users table
+    }
+    return null
+  } catch (error) {
+    console.error('Error getting user email from linked record:', error)
+    return null
+  }
+}
 
 async function getUserProfile(email) {
   try {
