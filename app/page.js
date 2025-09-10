@@ -512,7 +512,7 @@ export default function SolApp() {
 
       {/* Message Input */}
       <div style={{ padding: '32px' }}>
-        <div style={{ maxWidth: '1024px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
           <div style={{
             display: 'flex',
             alignItems: 'flex-end',
@@ -526,22 +526,28 @@ export default function SolApp() {
                 placeholder="Share what's on your mind, ask a question, or just check in..."
                 style={{
                   width: '100%',
-                  padding: '20px',
+                  padding: '16px 20px',
                   border: '1px solid rgba(255, 255, 255, 0.3)',
-                  borderRadius: '16px',
+                  borderRadius: '12px',
                   outline: 'none',
                   resize: 'none',
-                  minHeight: '60px',
-                  maxHeight: '128px',
-                  fontWeight: '300',
-                  color: '#334155',
-                  backgroundColor: 'rgba(255, 255, 255, 0.4)',
-                  backdropFilter: 'blur(8px)',
+                  minHeight: '52px',
+                  maxHeight: '120px',
+                  fontWeight: '400',
+                  color: '#2d3748',
+                  background: 'linear-gradient(135deg, #f8f7ff 0%, #f3f0ff 50%, #faf8ff 100%)',
                   fontSize: '16px',
-                  lineHeight: '1.5'
+                  lineHeight: '1.5',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 8px rgba(139, 92, 246, 0.1)'
                 }}
                 rows={1}
                 disabled={isTyping}
+                onInput={(e) => {
+                  e.target.style.height = 'auto'
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
+                }}
               />
             </div>
             
@@ -557,11 +563,11 @@ export default function SolApp() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 style={{
-                  padding: '16px',
+                  padding: '14px',
                   color: '#64748b',
                   backgroundColor: 'rgba(255, 255, 255, 0.3)',
                   border: 'none',
-                  borderRadius: '12px',
+                  borderRadius: '10px',
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}
@@ -575,13 +581,13 @@ export default function SolApp() {
                 onClick={handleSendMessage}
                 disabled={!currentMessage.trim() || isTyping}
                 style={{
-                  padding: '16px',
+                  padding: '14px',
                   backgroundColor: '#475569',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '12px',
+                  borderRadius: '10px',
                   cursor: !currentMessage.trim() || isTyping ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                  boxShadow: '0 4px 12px rgba(71, 85, 105, 0.3)',
                   transition: 'all 0.2s',
                   opacity: !currentMessage.trim() || isTyping ? 0.5 : 1
                 }}
