@@ -222,41 +222,40 @@ Return insights in the exact format above. If no significant new patterns emerge
 
 // Helper funtions //
 
-async function fetchUserContextForPersonalgorithm(email) {
+async function fetchPersonalgorithmDataDirect(email) {
   try {
-    const [userProfile, recentMessages, existingPersonalgorithm] = await Promise.allSettled([
-      getUserProfile(email),
-      getRecentMessages(email, 5),
-      getPersonalgorithmData(email, 5)
-    ])
+    console.log('Fetching Personalgorithm™ data for:', email)
+    
+    // FIXED: Filter by email directly since User ID field contains email
+    const encodedEmail = encodeURIComponent(email)
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=10`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
 
-    const context = {
-      userProfile: userProfile.status === 'fulfilled' ? userProfile.value : null,
-      recentMessages: recentMessages.status === 'fulfilled' ? recentMessages.value : [],
-      existingPersonalgorithm: existingPersonalgorithm.status === 'fulfilled' ? existingPersonalgorithm.value : []
+    if (!response.ok) {
+      console.error('❌ Personalgorithm™ data fetch failed:', response.status)
+      return []
     }
 
-    let summary = "USER CONTEXT FOR PERSONALGORITHM™ ANALYSIS:\n\n"
+    const data = await response.json()
     
-    if (context.userProfile) {
-      summary += `Current Vision: ${context.userProfile['Current Vision'] || 'Not set'}\n`
-      summary += `Current State: ${context.userProfile['Current State'] || 'Not set'}\n`
-      summary += `Tags: ${context.userProfile['Tags'] || 'None'}\n\n`
-    }
-    
-    if (context.existingPersonalgorithm.length > 0) {
-      summary += "EXISTING PERSONALGORITHM™ PATTERNS:\n"
-      context.existingPersonalgorithm.slice(0, 3).forEach((entry, i) => {
-        summary += `${i + 1}. ${entry.notes}\n`
-      })
-    }
-    
-    context.contextSummary = summary
-    return context
+    const personalgorithm = data.records.map(record => ({
+      notes: record.fields['Personalgorithm™ Notes'],
+      dateCreated: record.fields['Date created'],
+      tags: record.fields['Tags'] || ''
+    })).filter(item => item.notes)
+
+    console.log('✅ Found', personalgorithm.length, 'Personalgorithm™ entries')
+    return personalgorithm
 
   } catch (error) {
-    console.error('Error fetching user context for Personalgorithm™:', error)
-    return { contextSummary: 'Limited context available' }
+    console.error('❌ Error fetching Personalgorithm™:', error)
+    return []
   }
 }
 
