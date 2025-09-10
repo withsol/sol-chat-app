@@ -498,9 +498,9 @@ async function createPersonalgorithmEntryNew(email, notes, tags = ['auto-generat
       body: JSON.stringify({
         fields: {
           'Personalgorithm™ ID': personalgorithmId,
-          'User': email, // FIXED: Use email directly since Personalgorithm User field is text, not linked
+          'User ID': email, // FIXED: Use "User ID" instead of "User" to match your schema
           'Personalgorithm™ Notes': notes,
-          'Date created': new Date().toISOString(),
+          // Date created is auto-computed by Airtable
           'Tags': Array.isArray(tags) ? tags.join(', ') : tags
         }
       })
