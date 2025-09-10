@@ -1,7 +1,6 @@
-import ReactMarkdown from 'react-markdown'
-
 'use client'
 
+import ReactMarkdown from 'react-markdown'
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Send, Upload, Settings, User, AlertCircle, CheckCircle, LogOut } from 'lucide-react'
