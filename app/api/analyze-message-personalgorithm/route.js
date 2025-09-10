@@ -24,69 +24,33 @@ export async function POST(request) {
 
     console.log('Analyzing conversation for Personalgorithm™ insights...')
 
-    // Get user context for informed analysis
-    const userContext = await fetchUserContextForPersonalgorithm(email)
+    // Generate simple Personalgorithm™ insight
+    const insight = await generateSimplePersonalgorithmInsight(userMessage, solResponse)
     
-    // Combine message with conversation context for richer analysis
-    const fullConversationText = buildConversationAnalysisText(userMessage, solResponse, conversationContext)
-    
-    // Generate targeted Personalgorithm™ analysis focused on this conversation
-    const personalgorithmAnalysis = await generateConversationPersonalgorithmAnalysis(
-      fullConversationText,
-      userContext,
-      'conversation'
-    )
-    
-    // Create only the most significant insights (avoid spam)
-    const createdEntries = []
-    const maxEntriesPerConversation = 2
-    
-    // Priority categories for conversation analysis
-    const priorityCategories = [
-      'COMMUNICATION_PATTERNS',
-      'DECISION_MAKING_STYLE',
-      'EMOTIONAL_PATTERNS',
-      'TRANSFORMATION_TRIGGERS'
-    ]
-    
-    let entriesCreated = 0
-    
-    for (const category of priorityCategories) {
-      if (entriesCreated >= maxEntriesPerConversation) break
+    if (insight) {
+      // Create the entry
+      const entry = await createPersonalgorithmEntry(email, insight, ['auto-generated', 'conversation-derived'])
       
-      const insights = personalgorithmAnalysis.insights[category] || []
-      
-      for (const insight of insights.slice(0, 1)) { // Max 1 per category
-        if (insight.trim().length > 40 && entriesCreated < maxEntriesPerConversation) {
-          const entry = await createPersonalgorithmEntry(
-            email,
-            `[${category.replace(/_/g, ' ')}] ${insight}`,
-            [category.toLowerCase(), 'conversation-derived', 'real-time']
-          )
-          
-          if (entry) {
-            createdEntries.push({
-              category,
-              insight: insight.substring(0, 100) + '...',
-              entryId: entry.id
-            })
-            entriesCreated++
-          }
-        }
+      if (entry) {
+        console.log(`✅ Created Personalgorithm™ entry for ${email}`)
+        return NextResponse.json({
+          success: true,
+          analyzed: true,
+          entriesCreated: 1,
+          createdEntries: [{
+            insight: insight.substring(0, 100) + '...',
+            entryId: entry.id
+          }],
+          message: 'Added 1 new Personalgorithm™ insight from this conversation'
+        })
       }
     }
-
-    console.log(`✅ Created ${createdEntries.length} Personalgorithm™ entries from conversation`)
 
     return NextResponse.json({
       success: true,
       analyzed: true,
-      entriesCreated: createdEntries.length,
-      createdEntries: createdEntries,
-      analysisMetadata: personalgorithmAnalysis.metadata,
-      message: createdEntries.length > 0 
-        ? `Added ${createdEntries.length} new Personalgorithm™ insights from this conversation`
-        : 'Conversation analyzed - no new significant patterns detected'
+      entriesCreated: 0,
+      message: 'Conversation analyzed - no new significant patterns detected'
     })
 
   } catch (error) {
@@ -120,65 +84,25 @@ function shouldAnalyzeForPersonalgorithm(userMessage, solResponse) {
   return true
 }
 
-function buildConversationAnalysisText(userMessage, solResponse, conversationContext) {
-  let analysisText = `CURRENT EXCHANGE:
-USER: ${userMessage}
-SOL: ${solResponse}\n\n`
-
-  if (conversationContext.length > 0) {
-    analysisText += `RECENT CONVERSATION CONTEXT:\n`
-    conversationContext.slice(-3).forEach((msg, i) => {
-      analysisText += `${msg.role.toUpperCase()}: ${msg.content}\n`
-    })
-  }
-
-  return analysisText
-}
-
-async function generateConversationPersonalgorithmAnalysis(conversationText, userContext, sourceType) {
+async function generateSimplePersonalgorithmInsight(userMessage, solResponse) {
   try {
-    const analysisPrompt = `You are Sol™ analyzing a real-time conversation to extract Personalgorithm™ insights. Focus on NEW patterns that emerge from THIS specific conversation.
+    const analysisPrompt = `Analyze this coaching conversation for specific Personalgorithm™ patterns:
 
-EXISTING USER CONTEXT:
-${userContext.contextSummary || 'Limited context available'}
+USER: "${userMessage}"
+SOL: "${solResponse}"
 
-CONVERSATION TO ANALYZE:
-${conversationText}
+Look for ONE specific pattern about how this person:
+- Communicates (word choice, punctuation, emphasis, style)
+- Processes emotions or information
+- Makes decisions or approaches problems
+- Responds to different types of support or feedback
+- Expresses their needs or challenges
 
-Extract ONLY significant, NEW insights that aren't already captured in existing context. Focus on patterns that emerge from how they engaged in THIS conversation.
+Create ONE specific insight (2-3 sentences max) about this person's unique patterns. Focus on HOW they operate, not WHAT they said.
 
-COMMUNICATION_PATTERNS: [
-"How they expressed themselves in this specific exchange",
-"New communication preferences or patterns that emerged"
-]
+If no significant pattern emerges, respond with "NONE".
 
-DECISION_MAKING_STYLE: [
-"How they approached decisions or problem-solving in this conversation",
-"What factors influenced their thinking process here"
-]
-
-EMOTIONAL_PATTERNS: [
-"Emotional state or patterns revealed in this exchange",
-"How emotions influenced their communication or decisions"
-]
-
-TRANSFORMATION_TRIGGERS: [
-"What seemed to create 'aha' moments or shifts for them",
-"What type of support or guidance they responded to best"
-]
-
-PROCESSING_STYLE: [
-"How they processed information or feedback in this conversation",
-"What helped them gain clarity or understanding"
-]
-
-Only include insights that are:
-- Specific to this conversation
-- Reveal NEW patterns not already known
-- Based on their actual words and responses
-- Useful for future coaching interactions
-
-Return insights in the exact format above. If no significant new patterns emerge, return empty arrays.`
+Insight:`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -187,113 +111,36 @@ Return insights in the exact format above. If no significant new patterns emerge
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-4',
-        max_tokens: 800,
-        temperature: 0.2,
+        model: 'gpt-3.5-turbo',
+        max_tokens: 200,
+        temperature: 0.3,
         messages: [{ role: 'user', content: analysisPrompt }]
       })
     })
 
     if (!response.ok) {
-      throw new Error(`Conversation analysis failed: ${response.status}`)
+      console.error('Personalgorithm™ analysis failed:', response.status)
+      return null
     }
 
     const result = await response.json()
-    const analysis = result.choices[0].message.content
-
-    // Parse the analysis
-    const insights = parsePersonalgorithmAnalysis(analysis)
+    const insight = result.choices[0].message.content.trim()
     
-    return {
-      insights,
-      metadata: {
-        sourceType,
-        analysisDate: new Date().toISOString(),
-        conversationLength: conversationText.length,
-        totalInsights: Object.values(insights).flat().length
-      }
+    if (insight === 'NONE' || insight.includes('no significant') || insight.length < 20) {
+      return null
     }
+    
+    console.log('Generated insight:', insight.substring(0, 100) + '...')
+    return insight
 
   } catch (error) {
-    console.error('Error generating conversation Personalgorithm™ analysis:', error)
-    throw error
+    console.error('Error generating Personalgorithm™ insight:', error)
+    return null
   }
-}
-
-// Helper funtions //
-
-async function fetchPersonalgorithmDataDirect(email) {
-  try {
-    console.log('Fetching Personalgorithm™ data for:', email)
-    
-    // FIXED: Filter by email directly since User ID field contains email
-    const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=10`
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      console.error('❌ Personalgorithm™ data fetch failed:', response.status)
-      return []
-    }
-
-    const data = await response.json()
-    
-    const personalgorithm = data.records.map(record => ({
-      notes: record.fields['Personalgorithm™ Notes'],
-      dateCreated: record.fields['Date created'],
-      tags: record.fields['Tags'] || ''
-    })).filter(item => item.notes)
-
-    console.log('✅ Found', personalgorithm.length, 'Personalgorithm™ entries')
-    return personalgorithm
-
-  } catch (error) {
-    console.error('❌ Error fetching Personalgorithm™:', error)
-    return []
-  }
-}
-
-function parsePersonalgorithmAnalysis(analysis) {
-  const categories = [
-    'COMMUNICATION_PATTERNS',
-    'DECISION_MAKING_STYLE', 
-    'TRANSFORMATION_TRIGGERS',
-    'EMOTIONAL_PATTERNS',
-    'BUSINESS_MINDSET',
-    'PROCESSING_STYLE',
-    'STRENGTHS_LEVERAGE',
-    'GROWTH_EDGES',
-    'UNIQUE_FACTORS'
-  ]
-
-  const insights = {}
-
-  for (const category of categories) {
-    const match = analysis.match(new RegExp(`${category}: \\[([\\s\\S]*?)\\]`))
-    if (match) {
-      insights[category] = match[1]
-        .split('\n')
-        .map(line => line.replace(/^["\s,-]+|["\s,-]+$/g, '').trim())
-        .filter(line => line.length > 20)
-    } else {
-      insights[category] = []
-    }
-  }
-
-  return insights
 }
 
 async function createPersonalgorithmEntry(email, notes, tags = ['auto-generated']) {
   try {
-    const userRecordId = await getUserRecordId(email)
-    if (!userRecordId) return null
-
     const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™`, {
@@ -305,7 +152,7 @@ async function createPersonalgorithmEntry(email, notes, tags = ['auto-generated'
       body: JSON.stringify({
         fields: {
           'Personalgorithm™ ID': personalgorithmId,
-          'User': [userRecordId],
+          'User ID': email, // FIXED: Use email directly since User ID is single line text
           'Personalgorithm™ Notes': notes,
           'Date created': new Date().toISOString(),
           'Tags': Array.isArray(tags) ? tags.join(', ') : tags
@@ -313,12 +160,16 @@ async function createPersonalgorithmEntry(email, notes, tags = ['auto-generated'
       })
     })
 
-    if (response.ok) {
-      const result = await response.json()
-      console.log('✅ Personalgorithm™ entry created:', result.id)
-      return result
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Failed to create Personalgorithm™ entry:', response.status, errorText)
+      return null
     }
-    return null
+
+    const result = await response.json()
+    console.log('✅ Personalgorithm™ entry created:', result.id)
+    return result
+    
   } catch (error) {
     console.error('Error creating Personalgorithm™ entry:', error)
     return null
