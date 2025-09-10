@@ -158,32 +158,91 @@ export default function SolApp() {
   }
 
   const handleFileUpload = async (event) => {
-    const file = event.target.files[0]
-    if (!file) return
+  const file = event.target.files[0]
+  if (!file) return
 
-    const fileMessage = {
-      id: `file_${Date.now()}`,
-      role: 'user',
-      content: `📎 Uploaded: ${file.name}`,
+  const fileMessage = {
+    id: `file_${Date.now()}`,
+    role: 'user',
+    content: `📎 Uploaded: ${file.name}`,
+    timestamp: new Date().toISOString(),
+    fileAttachment: file,
+    tags: ['file-upload']
+  }
+  
+  setMessages(prev => [...prev, fileMessage])
+  
+  // Show processing message
+  const processingMessage = {
+    id: `processing_${Date.now()}`,
+    role: 'sol',
+    content: `I'm reading and processing "${file.name}"... This may take a moment.`,
+    timestamp: new Date().toISOString(),
+    tags: ['file-processing']
+  }
+  
+  setMessages(prev => [...prev, processingMessage])
+
+  try {
+    // Read and process the file
+    const result = await processUploadedFile(file, user.email)
+    
+    // Remove processing message and add success message
+    setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id))
+    
+    const successMessage = {
+      id: `success_${Date.now()}`,
+      role: 'sol',
+      content: result.message,
       timestamp: new Date().toISOString(),
-      fileAttachment: file,
-      tags: ['file-upload']
+      tags: ['file-processed']
     }
     
-    setMessages(prev => [...prev, fileMessage])
+    setMessages(prev => [...prev, successMessage])
     
-    setTimeout(() => {
-      const responseMessage = {
-        id: `response_${Date.now()}`,
-        role: 'sol',
-        content: `I've received your file "${file.name}". I'm processing this and adding it to your Lore™ database. What context would you like me to have about this file? How does it connect to what you're working on?`,
-        timestamp: new Date().toISOString(),
-        tags: ['file-processing']
-      }
-      
-      setMessages(prev => [...prev, responseMessage])
-    }, 1500)
+  } catch (error) {
+    console.error('File processing error:', error)
+    
+    // Remove processing message and add error message
+    setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id))
+    
+    const errorMessage = {
+      id: `error_${Date.now()}`,
+      role: 'sol',
+      content: `I had trouble processing "${file.name}". Could you try copying and pasting the text content directly instead?`,
+      timestamp: new Date().toISOString(),
+      tags: ['file-error']
+    }
+    
+    setMessages(prev => [...prev, errorMessage])
   }
+}
+
+// Add this new function right after the handleFileUpload function:
+async function processUploadedFile(file, userEmail) {
+  try {
+    // Create FormData to send file
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('email', userEmail)
+    
+    const response = await fetch('/api/process-file', {
+      method: 'POST',
+      body: formData
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Processing failed: ${response.status}`)
+    }
+    
+    const result = await response.json()
+    return result
+    
+  } catch (error) {
+    console.error('Error processing file:', error)
+    throw error
+  }
+}
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
