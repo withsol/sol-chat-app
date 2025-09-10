@@ -271,7 +271,7 @@ export default function SolApp() {
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontSize: '18px',
+            fontSize: '22px',
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
           }}>
             ✷
@@ -279,7 +279,7 @@ export default function SolApp() {
           <div>
             <h1 style={{ 
               fontSize: '20px', 
-              fontWeight: '300', 
+              fontWeight: '400', 
               color: '#1e293b', 
               letterSpacing: '0.025em',
               margin: 0
@@ -402,7 +402,7 @@ export default function SolApp() {
               color: message.role === 'user' ? '#475569' : '#334155', // Changed user text color
               borderRadius: '24px',
               padding: '28px',
-              boxShadow: message.role === 'user' ? '0 2px 8px rgba(139, 92, 246, 0.1)' : 'none',
+              boxShadow: message.role === 'user' ? '0 2px 8px hsla(258, 90%, 66%, 0.00)' : 'none',
               background: message.role === 'user' 
                 ? 'linear-gradient(135deg, #f8f7ff 0%, #f3f0ff 50%, #faf8ff 100%)' 
                 : 'transparent'
@@ -525,7 +525,7 @@ export default function SolApp() {
 
       {/* Message Input */}
       <div style={{ padding: '32px' }}>
-        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '700px', margin: '0 auto' }}>
           <div style={{
             display: 'flex',
             alignItems: 'flex-end',
@@ -536,11 +536,11 @@ export default function SolApp() {
                 value={currentMessage}
                 onChange={(e) => setCurrentMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Share what's on your mind, ask a question, or just check in..."
+                placeholder="What's coming up for you?"
                 style={{
                   width: '100%',
                   padding: '16px 20px',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  border: '0px solid rgba(255, 255, 255, 0.3)',
                   borderRadius: '12px',
                   outline: 'none',
                   resize: 'none',
@@ -568,7 +568,7 @@ export default function SolApp() {
               display: 'flex', 
               gap: '12px',
               alignItems: 'flex-end', // Better alignment with textarea
-              paddingBottom: '2px' // Fine-tune alignment
+              paddingBottom: '5px' // Fine-tune alignment
             }}>
               <input
                 type="file"
