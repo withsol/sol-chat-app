@@ -392,7 +392,7 @@ export default function SolApp() {
             }}
           >
             <div style={{
-              maxWidth: '512px',
+              maxWidth: '600px',
               backgroundColor: message.role === 'user' ? 'linear-gradient(135deg, #f8f7ff 0%, #f3f0ff 50%, #faf8ff 100%)' : 'transparent',
               color: message.role === 'user' ? 'white' : '#334155',
               borderRadius: '24px',
@@ -533,8 +533,8 @@ export default function SolApp() {
                   resize: 'none',
                   minHeight: '52px',
                   maxHeight: '120px',
-                  fontWeight: '600',
-                  color: '#5d687aff',
+                  fontWeight: '300',
+                  color: '#717f95ff',
                   background: 'linear-gradient(135deg, #f8f7ff 0%, #f3f0ff 50%, #faf8ff 100%)',
                   fontSize: '16px',
                   lineHeight: '1.5',
@@ -602,7 +602,7 @@ export default function SolApp() {
             fontSize: '12px',
             color: '#64748b',
             textAlign: 'center',
-            fontWeight: '500',
+            fontWeight: '400',
             letterSpacing: '0.025em'
           }}>
             Everything you share builds your Personalgorithm™ • Powered by your Lore™ memory database
