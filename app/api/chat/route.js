@@ -2,16 +2,40 @@ import { NextResponse } from 'next/server'
 
 // ==================== VISIONING DETECTION & GUIDANCE ====================
 
+function detectDocumentType(userMessage) {
+  const message = userMessage.toLowerCase()
+  
+  // Check for business plan indicators
+  if (message.includes('business plan') || message.includes('aligned business')) {
+    return 'business-plan'
+  }
+  
+  // Check for visioning indicators  
+  if (message.includes('visioning') || message.includes('vision homework')) {
+    return 'visioning'
+  }
+  
+  return null
+}
+
 function detectVisioningIntent(userMessage) {
-  const visioningKeywords = [
-    'visioning', 'vision homework', 'brand analysis', 'ideal client',
-    'business plan', 'future goals', 'mission statement', 'values',
-    'competitive analysis', 'audience analysis', 'free write'
+  const message = userMessage.toLowerCase()
+  
+  // Don't trigger if they're sharing/providing documents
+  const providingDocument = [
+    'here is my', 'this is my', "it's my", 'i have my', 'my completed',
+    'here\'s my', 'uploaded my', 'sharing my'
+  ].some(phrase => message.includes(phrase))
+  
+  if (providingDocument) return false
+  
+  // Only trigger on questions or requests for help
+  const helpRequests = [
+    'help with visioning', 'work on visioning', 'need help with vision',
+    'want to do visioning', 'ready for visioning'
   ]
   
-  return visioningKeywords.some(keyword => 
-    userMessage.toLowerCase().includes(keyword)
-  )
+  return helpRequests.some(phrase => message.includes(phrase))
 }
 
 async function handleVisioningGuidance(userMessage, userContextData, user) {
@@ -19,6 +43,23 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
     // Check if user has completed visioning
     const hasVisioning = userContextData.visioningData !== null
     
+    // Check if they're providing a document
+    const documentType = detectDocumentType(userMessage)
+    if (documentType) {
+      if (documentType === 'visioning') {
+        return {
+          content: `Perfect! I can see you're sharing your visioning homework. Could you paste the text content here so I can extract all the insights and build your Personalgorithm™? I'll process everything from your comprehensive visioning document and update your profile with your vision, goals, ideal client details, and more.`,
+          hasVisioningGuidance: true
+        }
+      } else if (documentType === 'business-plan') {
+        return {
+          content: `Great! I can see you're sharing your Aligned Business Plan. Could you paste the content here so I can process it and add the strategic insights to your Personalgorithm™? I'll extract your business vision, goals, ideal client profile, and strategic context.`,
+          hasVisioningGuidance: true
+        }
+      }
+    }
+    
+    // Original visioning guidance for help requests
     if (!hasVisioning && detectVisioningIntent(userMessage)) {
       return {
         content: `I can see you're interested in working on your visioning! I have a couple of ways we can approach this:
@@ -29,15 +70,7 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
 
 **Option 3: Work Through It Together** - I can ask you thoughtful questions to help you explore each area of your vision, values, ideal client, challenges, and goals.
 
-Your visioning homework covers 6 key areas:
-• Basic Brand Analysis (goals, values, differentiation)
-• Free-form exploration of your business dreams
-• Ideal Client deep dive  
-• Competitive landscape
-• Sales & Marketing systems
-• Current reality & mindset
-
-Which approach feels right for you? Or would you like me to start with some visioning questions based on what you've shared so far?`,
+Which approach feels right for you?`,
         hasVisioningGuidance: true
       }
     }
