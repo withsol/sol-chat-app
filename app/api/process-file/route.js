@@ -1,6 +1,4 @@
-
 import { NextResponse } from 'next/server'
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js'
 
 export async function POST(request) {
   console.log('=== FILE PROCESSING API ===')
@@ -24,18 +22,30 @@ export async function POST(request) {
     
     let extractedText = ''
     
-  // Handle different file types
+    // Handle different file types
     if (file.type === 'application/pdf') {
-    console.log('Processing PDF with pdfjs-dist...')
-    
-    try {
-        // Set worker source for Node.js environment
-        pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js')
+      console.log('Processing PDF with pdfjs-dist v5...')
+      
+      try {
+        // Updated import for pdfjs-dist v5.x
+        const pdfjsLib = await import('pdfjs-dist')
         
-        // Load the PDF document
+        // For v5.x, worker configuration is different
+        if (typeof window === 'undefined') {
+          // Disable worker in server environment
+          pdfjsLib.GlobalWorkerOptions.workerSrc = false
+        }
+        
+        // Load the PDF document with v5.x compatible options
         const loadingTask = pdfjsLib.getDocument({
-        data: new Uint8Array(buffer),
-        useSystemFonts: true
+          data: new Uint8Array(buffer),
+          useSystemFonts: true,
+          disableFontFace: true,
+          useWorkerFetch: false,
+          isEvalSupported: false,
+          disableCreateObjectURL: true,
+          // v5.x specific options
+          verbosity: 0 // Suppress console warnings
         })
     
         const pdfDocument = await loadingTask.promise
@@ -45,33 +55,47 @@ export async function POST(request) {
         
         // Extract text from each page
         for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-        const page = await pdfDocument.getPage(pageNum)
-        const textContent = await page.getTextContent()
-        
-        const pageText = textContent.items
-            .map(item => ('str' in item) ? item.str : '')
-            .join(' ')
-        
-        fullText += pageText + '\n'
+          try {
+            const page = await pdfDocument.getPage(pageNum)
+            const textContent = await page.getTextContent()
+            
+            const pageText = textContent.items
+              .map(item => {
+                // Handle different item types in v5.x
+                if (item && typeof item === 'object' && 'str' in item) {
+                  return item.str
+                }
+                return ''
+              })
+              .join(' ')
+            
+            fullText += pageText + '\n'
+          } catch (pageError) {
+            console.warn(`Error processing page ${pageNum}:`, pageError)
+            // Continue with other pages
+          }
         }
         
         extractedText = fullText.trim()
         console.log('Extracted text length:', extractedText.length)
         
-    } catch (pdfError) {
+        // Clean up
+        await pdfDocument.destroy()
+        
+      } catch (pdfError) {
         console.error('PDF processing error:', pdfError)
         return NextResponse.json({ 
-        error: 'Failed to process PDF. Please ensure it\'s a valid PDF file or try converting to text.' 
+          error: 'Failed to process PDF. Please ensure it\'s a valid PDF file or try converting to text.' 
         }, { status: 400 })
-    }
+      }
   
-} else if (file.type === 'text/plain') {
-  extractedText = buffer.toString('utf-8')
-} else {
-  return NextResponse.json({ 
-    error: 'Unsupported file type. Please upload PDF or text files.' 
-  }, { status: 400 })
-}
+    } else if (file.type === 'text/plain') {
+      extractedText = buffer.toString('utf-8')
+    } else {
+      return NextResponse.json({ 
+        error: 'Unsupported file type. Please upload PDF or text files.' 
+      }, { status: 400 })
+    }
 
     if (!extractedText || extractedText.trim().length === 0) {
       return NextResponse.json({ 
