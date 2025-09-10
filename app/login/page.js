@@ -1,6 +1,104 @@
-<div onSubmit={handleLogin}>
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { AlertCircle, Loader2 } from 'lucide-react'
+
+export default function LoginPage() {
+  const [email, setEmail] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  const router = useRouter()
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
+
+    try {
+      // Verify subscription with Thrivecart
+      const response = await fetch('/api/auth/thrivecart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+
+      const result = await response.json()
+
+      if (result.hasActiveSubscription) {
+        // Store user session
+        localStorage.setItem('sol_user', JSON.stringify({
+          email,
+          authenticated: true,
+          loginTime: new Date().toISOString()
+        }))
+        
+        // Redirect to Sol chat
+        router.push('/')
+      } else {
+        setError('No active subscription found. Please ensure you have an active subscription to The Art of Becoming program.')
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      setError('Unable to verify your subscription. Please try again.')
+    }
+
+    setIsLoading(false)
+  }
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #f4f2f0 0%, #f1f0f6 35%, #eef4f2 70%, #f3f1f0 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '16px'
+    }}>
+      <div style={{
+        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+        backdropFilter: 'blur(8px)',
+        borderRadius: '24px',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        padding: '48px',
+        width: '100%',
+        maxWidth: '480px',
+        border: '1px solid rgba(255, 255, 255, 0.2)'
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+          <div style={{
+            width: '80px',
+            height: '80px',
+            backgroundColor: '#475569',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: '32px',
+            margin: '0 auto 24px auto',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+          }}>
+            ✷
+          </div>
+          <h1 style={{ 
+            fontSize: '32px', 
+            fontWeight: '400', 
+            color: '#1e293b', 
+            letterSpacing: '0.025em',
+            margin: '0 0 8px 0'
+          }}>Welcome to Sol™</h1>
+          <p style={{ 
+            fontSize: '16px', 
+            color: '#64748b', 
+            fontWeight: '300',
+            margin: 0
+          }}>Your AI Business Partner</p>
+        </div>
+
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div>
+            <label htmlFor="email" style={{
               display: 'block',
               fontSize: '14px',
               fontWeight: '500',
@@ -29,24 +127,11 @@
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                 transition: 'all 0.2s ease',
                 boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-                opacity: isLoading ? 0.6 : 1
+                opacity: isLoading ? 0.6 : 1,
+                boxSizing: 'border-box'
               }}
               required
               disabled={isLoading}
-              onFocus={(e) => {
-                e.target.style.boxShadow = '0 2px 8px rgba(71, 85, 105, 0.15)'
-                e.target.style.borderColor = 'rgba(71, 85, 105, 0.3)'
-              }}
-              onBlur={(e) => {
-                e.target.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.05)'
-                e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)'
-              }}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  handleLogin(e)
-                }
-              }}
             />
             <p style={{
               marginTop: '8px',
@@ -67,8 +152,7 @@
               padding: '16px',
               display: 'flex',
               alignItems: 'flex-start',
-              gap: '12px',
-              marginBottom: '24px'
+              gap: '12px'
             }}>
               <AlertCircle style={{ 
                 width: '20px', 
@@ -87,7 +171,7 @@
           )}
 
           <button
-            onClick={handleLogin}
+            type="submit"
             disabled={isLoading || !email}
             style={{
               width: '100%',
@@ -109,26 +193,29 @@
               gap: '8px',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
             }}
-            onMouseOver={(e) => {
-              if (!isLoading && email) {
-                e.target.style.backgroundColor = '#334155'
-                e.target.style.transform = 'translateY(-1px)'
-                e.target.style.boxShadow = '0 20px 25px -5px rgba(71, 85, 105, 0.4)'
-              }
-            }}
-            onMouseOut={(e) => {
-              e.target.style.backgroundColor = '#475569'
-              e.target.style.transform = 'translateY(0)'
-              e.target.style.boxShadow = '0 10px 15px -3px rgba(71, 85, 105, 0.3)'
-            }}
           >
             {isLoading ? (
               <>
-                <Loader2 style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite' }} />
+                <Loader2 style={{ 
+                  width: '20px', 
+                  height: '20px',
+                  animation: 'spin 1s linear infinite'
+                }} />
                 <span>Verifying course access...</span>
               </>
             ) : (
               <span>Access Sol™</span>
             )}
           </button>
-        </div>
+        </form>
+      </div>
+      
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  )
+}
