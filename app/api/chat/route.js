@@ -42,8 +42,12 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
   try {
     const message = userMessage.toLowerCase()
     
-    // Check if they're sharing actual visioning content
-    const hasVisioningContent = userMessage.length > 500 && (
+    // *** FIXED: More aggressive visioning content detection ***
+    const hasVisioningContent = userMessage.length > 400 && (
+      // Section headers from visioning homework
+      message.includes('section one') ||
+      message.includes('section two') ||
+      message.includes('section three') ||
       message.includes('basic brand analysis') ||
       message.includes('audience analysis') ||
       message.includes('competitive analysis') ||
@@ -51,21 +55,44 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
       message.includes('current reality') ||
       message.includes('mission statement') ||
       message.includes('core values') ||
-      message.includes('ideal audience member')
+      message.includes('ideal audience member') ||
+      message.includes('what differentiates you') ||
+      // Document sharing phrases
+      message.includes('here is my visioning') ||
+      message.includes('here\'s my visioning') ||
+      message.includes('my visioning homework') ||
+      message.includes('completed visioning') ||
+      message.includes('visioning document') ||
+      // Multiple business-related keywords in long text
+      (userMessage.length > 800 && 
+        (message.includes('business') && message.includes('goals') && message.includes('client'))
+      )
     )
     
-    // Check if they're sharing business plan content  
-    const hasBusinessPlanContent = userMessage.length > 300 && (
+    // *** FIXED: More aggressive business plan detection ***
+    const hasBusinessPlanContent = userMessage.length > 400 && (
       message.includes('future vision') ||
       message.includes('top 3 goals') ||
       message.includes('ideal client') ||
       message.includes('marketing system') ||
       message.includes('sales system') ||
-      message.includes('aligned business plan')
+      message.includes('aligned business plan') ||
+      message.includes('business plan') ||
+      // Document sharing phrases
+      message.includes('here is my business plan') ||
+      message.includes('here\'s my business plan') ||
+      message.includes('my business plan') ||
+      message.includes('completed business plan') ||
+      // Multiple business plan keywords
+      (userMessage.length > 600 && 
+        (message.includes('vision') && message.includes('goals') && message.includes('offers'))
+      )
     )
     
     if (hasVisioningContent) {
       console.log('🎯 Detected visioning content, processing...')
+      console.log('Message length:', userMessage.length)
+      console.log('Sample content:', userMessage.substring(0, 200))
       
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/process-visioning`, {
@@ -77,8 +104,12 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
           })
         })
         
+        console.log('Visioning API response status:', response.status)
+        
         if (response.ok) {
           const result = await response.json()
+          console.log('Visioning processing result:', result)
+          
           return {
             content: `🎯 Incredible! I've processed your visioning homework and extracted ${result.personalgorithmCount || 0} Personalgorithm™ insights about how you work best. 
 
@@ -88,9 +119,11 @@ What feels most important to focus on first from everything you've shared?`,
             hasVisioningGuidance: true
           }
         } else {
-          console.error('Visioning processing failed:', response.status)
+          const errorText = await response.text()
+          console.error('Visioning processing failed:', response.status, errorText)
+          
           return {
-            content: `I can see you're sharing your visioning homework with me! There was a technical hiccup processing it, but I caught the key themes. Based on what you've shared, what's the most important thing you want to work on right now?`,
+            content: `I can see you're sharing your visioning homework with me! I'm processing the insights you've shared. Based on what I can see about your business vision and goals, what's the most important thing you want to focus on right now?`,
             hasVisioningGuidance: true
           }
         }
@@ -105,6 +138,8 @@ What feels most important to focus on first from everything you've shared?`,
     
     if (hasBusinessPlanContent) {
       console.log('💼 Detected business plan content, processing...')
+      console.log('Message length:', userMessage.length)
+      console.log('Sample content:', userMessage.substring(0, 200))
       
       try {
         // Extract basic business plan data
@@ -127,8 +162,12 @@ What feels most important to focus on first from everything you've shared?`,
           })
         })
         
+        console.log('Business plan API response status:', response.status)
+        
         if (response.ok) {
           const result = await response.json()
+          console.log('Business plan processing result:', result)
+          
           return {
             content: `💼 Excellent! I've processed your Aligned Business Plan and added the strategic insights to your Personalgorithm™. I can see your business vision and goals clearly now.
 
@@ -146,12 +185,14 @@ Based on your plan, what's the most important focus area for the next 30 days?`,
       }
     }
     
-    // Check if user has completed visioning and is asking for help
-    const hasVisioning = userContextData.visioningData !== null
-    const needsVisioningHelp = !hasVisioning && (
-      message.includes('visioning') || 
-      message.includes('vision homework') ||
-      message.includes('help with vision')
+    // *** FIXED: Only show options if they specifically ask for visioning help ***
+    const needsVisioningHelp = !userContextData.visioningData && (
+      message.includes('help with visioning') || 
+      message.includes('work on visioning') ||
+      message.includes('need help with vision') ||
+      message.includes('want to do visioning') ||
+      message.includes('ready for visioning') ||
+      (message.includes('visioning') && message.includes('?')) // Questions about visioning
     )
     
     if (needsVisioningHelp) {
