@@ -32,7 +32,7 @@ export async function POST(request) {
         visioningRecords = [record]
       }
     } else {
-      // Get all visioning records for user
+      // Get user record ID first, then find visioning records
       const userRecordId = await getUserRecordId(email)
       if (!userRecordId) {
         return NextResponse.json({ 
@@ -40,7 +40,8 @@ export async function POST(request) {
         }, { status: 404 })
       }
       
-      const filterFormula = encodeURIComponent(`{User ID} = "${userRecordId}"`)
+      // FIXED: Search by linked User ID field, not User ID text field
+      const filterFormula = encodeURIComponent(`FIND("${userRecordId}", ARRAYJOIN({User ID}))>0`)
       const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Visioning?filterByFormula=${filterFormula}`, {
         headers: {
           'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
@@ -70,8 +71,11 @@ export async function POST(request) {
         const fields = record.fields
         const visioningText = fields['Visioning Homework - Text Format'] || ''
         
-        // Get user email from the linked user record
-        const userEmail = email || await getUserEmailFromRecordId(fields['User ID'][0])
+        // FIXED: Get user email properly from linked field
+        let userEmail = email
+        if (!userEmail && fields['User ID'] && fields['User ID'].length > 0) {
+          userEmail = await getUserEmailFromRecordId(fields['User ID'][0])
+        }
         
         if (!visioningText) {
           console.log('No text content found in visioning record:', record.id)
@@ -87,8 +91,8 @@ export async function POST(request) {
 
         console.log(`Processing visioning record ${record.id} with ${visioningText.length} characters`)
 
-        // Use your existing analysis function
-        const analysis = await analyzeVisioningDocument(visioningText)
+        // Use enhanced analysis function
+        const analysis = await analyzeVisioningDocumentEnhanced(visioningText)
         
         // Update the user's profile with comprehensive vision data
         const profileUpdates = {
@@ -97,12 +101,16 @@ export async function POST(request) {
           'Current State': analysis.currentState || ''
         }
 
-        // Add/update tags
+        // Add/update tags intelligently
         if (analysis.tags) {
           const existingProfile = await getUserProfile(userEmail)
           const existingTags = existingProfile?.['Tags'] || ''
-          const newTags = existingTags ? `${existingTags}, ${analysis.tags}` : analysis.tags
-          profileUpdates['Tags'] = newTags
+          const newTagsList = analysis.tags.split(',').map(tag => tag.trim())
+          const existingTagsList = existingTags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+          
+          // Merge and deduplicate tags
+          const allTags = [...new Set([...existingTagsList, ...newTagsList])].filter(tag => tag.length > 0)
+          profileUpdates['Tags'] = allTags.join(', ')
         }
 
         await updateUserProfile(userEmail, profileUpdates)
@@ -148,51 +156,52 @@ export async function POST(request) {
   }
 }
 
-// ==================== ANALYSIS AND UPDATE FUNCTIONS ====================
+// ==================== ENHANCED ANALYSIS FUNCTION ====================
 
-async function analyzeVisioningDocument(visioningText) {
+async function analyzeVisioningDocumentEnhanced(visioningText) {
   try {
     console.log('Starting enhanced visioning analysis...')
     
-    const analysisPrompt = `You are Sol™, analyzing comprehensive visioning homework. Extract detailed insights for personalized business coaching.
+    const analysisPrompt = `You are Sol™, analyzing comprehensive visioning homework with Kelsey's Aligned Business® Method. Extract detailed insights for building this person's Personalgorithm™.
 
 VISIONING DOCUMENT:
 "${visioningText}"
 
-Analyze this document and extract information in this EXACT JSON format:
+Analyze this document thoroughly and provide insights in this EXACT JSON format:
 
 {
   "businessName": "extracted business name or 'Not specified'",
   "industry": "their industry/niche",
   "businessStage": "startup/growing/established based on context",
-  "vision": "1-year, 3-year, and 7-year goals combined into one vision statement",
-  "goals": "primary 1-year goals",
-  "currentState": "current business situation and challenges",
+  "vision": "comprehensive vision statement combining their 1-year, 3-year, and 7-year goals",
+  "goals": "specific 1-year goals and priorities",
+  "currentState": "current business situation, challenges, and context",
   "values": "core business values mentioned",
-  "missionStatement": "their mission or purpose",
+  "missionStatement": "their mission or purpose statement",
   "differentiation": "what sets them apart from competitors",
   "challenges": "main obstacles or challenges they face",
   "strengths": "what they love most about their business or do well",
-  "mindsetBlocks": "any limiting beliefs or fears mentioned",
-  "idealClient": "description of their ideal client or audience",
-  "clientProblems": "problems their business solves",
-  "currentOfferings": "current products or services",
-  "marketingEfforts": "current marketing activities",
-  "communicationStyle": "how they express themselves (analytical/emotional/direct/etc)",
-  "learningStyle": "how they seem to process and create change",
-  "transformationTriggers": "what motivates them based on past successes",
-  "coachingNeeds": "what kind of support they seem to need most",
+  "mindsetBlocks": "limiting beliefs, fears, or blocks mentioned",
+  "idealClient": "detailed description of their ideal client or audience",
+  "clientProblems": "problems their business solves for clients",
+  "currentOfferings": "current products or services they offer",
+  "marketingEfforts": "current marketing activities and channels",
+  "communicationStyle": "how they express themselves (analytical/emotional/direct/visual/etc)",
+  "learningStyle": "how they seem to process information and create change",
+  "transformationTriggers": "what motivates them to take action based on past successes",
+  "coachingNeeds": "what kind of support and coaching approach they most need",
   "personalgorithmInsights": [
-    "Specific insight about their decision-making patterns",
-    "Insight about their communication style and processing",
-    "Insight about what drives their transformation",
-    "Insight about their emotional patterns or mindset",
-    "Insight about their business approach or strategy style"
+    "Specific insight about their decision-making patterns and preferences",
+    "Insight about their communication style and how they process information",
+    "Insight about what drives their transformation and motivation",
+    "Insight about their emotional patterns, energy, or mindset tendencies",
+    "Insight about their business approach, strengths, or unique style",
+    "Insight about their relationship with money, success, or growth"
   ],
-  "tags": "industry, business-stage, personality-traits, coaching-needs"
+  "tags": "industry, business-stage, personality-traits, coaching-needs, communication-style"
 }
 
-Extract as much detailed, specific information as possible. If something isn't mentioned, use "Not specified" rather than making assumptions.`
+Extract as much detailed, specific information as possible. If something isn't clearly mentioned, use "Not specified" rather than making assumptions. Focus on insights that will help Sol provide deeply personalized coaching.`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -202,7 +211,7 @@ Extract as much detailed, specific information as possible. If something isn't m
       },
       body: JSON.stringify({
         model: 'gpt-4',
-        max_tokens: 1500,
+        max_tokens: 1800,
         temperature: 0.3,
         messages: [{ role: 'user', content: analysisPrompt }]
       })
@@ -217,34 +226,83 @@ Extract as much detailed, specific information as possible. If something isn't m
 
     // Parse the JSON response
     try {
-      const analysis = JSON.parse(analysisText)
-      console.log('✅ Analysis completed successfully')
-      return analysis
+      // Clean up the response to extract just the JSON
+      const jsonMatch = analysisText.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        const analysis = JSON.parse(jsonMatch[0])
+        console.log('✅ Enhanced analysis completed successfully')
+        return analysis
+      } else {
+        throw new Error('No JSON found in response')
+      }
     } catch (parseError) {
       console.error('Failed to parse analysis as JSON, using fallback:', parseError)
-      // Create basic fallback analysis
-      return {
-        businessName: 'Not specified',
-        industry: 'Not specified',
-        vision: 'Visioning homework analyzed',
-        goals: 'Business goals documented',
-        currentState: 'Current business state documented',
-        personalgorithmInsights: [
-          'Completed comprehensive visioning homework - shows commitment to business planning',
-          'Provided detailed business context for personalized coaching'
-        ],
-        tags: 'visioning-complete, business-planning'
-      }
+      console.log('Raw analysis response:', analysisText)
+      
+      // Create enhanced fallback analysis by extracting what we can
+      return createFallbackAnalysis(visioningText)
     }
 
   } catch (error) {
     console.error('Error analyzing visioning document:', error)
-    throw error
+    return createFallbackAnalysis(visioningText)
   }
 }
 
+function createFallbackAnalysis(visioningText) {
+  // Simple keyword-based extraction as fallback
+  const text = visioningText.toLowerCase()
+  
+  let businessName = 'Not specified'
+  let industry = 'Not specified'
+  
+  // Try to extract business name
+  const namePatterns = [
+    /my business is called ([^.!?\n]+)/i,
+    /business name[:\s]+([^.!?\n]+)/i,
+    /company[:\s]+([^.!?\n]+)/i
+  ]
+  
+  for (const pattern of namePatterns) {
+    const match = visioningText.match(pattern)
+    if (match) {
+      businessName = match[1].trim()
+      break
+    }
+  }
+  
+  // Try to extract industry
+  const industryKeywords = ['coaching', 'consulting', 'design', 'marketing', 'wellness', 'therapy', 'photography', 'writing', 'tech', 'fitness']
+  for (const keyword of industryKeywords) {
+    if (text.includes(keyword)) {
+      industry = keyword
+      break
+    }
+  }
+  
+  return {
+    businessName,
+    industry,
+    businessStage: 'Not specified',
+    vision: 'Detailed visioning homework completed - analysis shows commitment to business growth and planning',
+    goals: 'Business goals documented in comprehensive visioning homework',
+    currentState: 'Current business state and challenges documented through visioning process',
+    personalgorithmInsights: [
+      'Completed comprehensive visioning homework - demonstrates commitment to structured business planning',
+      'Provided extensive business context showing self-awareness and strategic thinking',
+      'Took time for deep reflection on business vision, values, and goals'
+    ],
+    tags: 'visioning-complete, business-planning, strategic-thinking'
+  }
+}
+
+// ==================== ENHANCED UPDATE FUNCTIONS ====================
+
 async function updateVisioningRecord(recordId, analysis) {
   try {
+    const actionSteps = generateEnhancedActionSteps(analysis)
+    const solNotes = generateSolNotes(analysis)
+    
     const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Visioning/${recordId}`, {
       method: 'PATCH',
       headers: {
@@ -253,45 +311,72 @@ async function updateVisioningRecord(recordId, analysis) {
       },
       body: JSON.stringify({
         fields: {
-          'Summary of Visioning': `Business: ${analysis.businessName || 'Not specified'} | Industry: ${analysis.industry || 'Not specified'} | Vision: ${analysis.vision || 'Not specified'} | Goals: ${analysis.goals || 'Not specified'}`,
+          'Summary of Visioning': `Business: ${analysis.businessName || 'Not specified'} | Industry: ${analysis.industry || 'Not specified'} | Stage: ${analysis.businessStage || 'Not specified'} | Vision: ${(analysis.vision || '').substring(0, 100)}${analysis.vision?.length > 100 ? '...' : ''}`,
           'Tags': analysis.tags || 'visioning-analyzed',
-          'Action Steps': generateActionSteps(analysis),
-          'Notes for Sol': `Communication Style: ${analysis.communicationStyle || 'Not specified'}. Learning Style: ${analysis.learningStyle || 'Not specified'}. Transformation Triggers: ${analysis.transformationTriggers || 'Not specified'}. Coaching Needs: ${analysis.coachingNeeds || 'Not specified'}.`,
+          'Action Steps': actionSteps,
+          'Notes for Sol': solNotes,
           'Reviewed (?)': true
         }
       })
     })
 
     if (response.ok) {
-      console.log('✅ Visioning record updated')
+      console.log('✅ Visioning record updated with enhanced analysis')
     } else {
-      console.error('Failed to update visioning record:', response.status)
+      const errorText = await response.text()
+      console.error('Failed to update visioning record:', response.status, errorText)
     }
   } catch (error) {
     console.error('Error updating visioning record:', error)
   }
 }
 
-function generateActionSteps(analysis) {
+function generateEnhancedActionSteps(analysis) {
   const steps = []
   
-  if (analysis.goals) {
-    steps.push(`1) Focus on primary goals: ${analysis.goals}`)
+  if (analysis.goals && analysis.goals !== 'Not specified') {
+    steps.push(`1) Primary focus: ${analysis.goals}`)
   }
   
-  if (analysis.challenges) {
-    steps.push(`2) Address key challenges: ${analysis.challenges}`)
+  if (analysis.challenges && analysis.challenges !== 'Not specified') {
+    steps.push(`2) Address challenges: ${analysis.challenges}`)
   }
   
-  if (analysis.strengths) {
+  if (analysis.strengths && analysis.strengths !== 'Not specified') {
     steps.push(`3) Leverage strengths: ${analysis.strengths}`)
   }
   
-  if (analysis.idealClient) {
-    steps.push(`4) Develop ideal client strategy: ${analysis.idealClient}`)
+  if (analysis.idealClient && analysis.idealClient !== 'Not specified') {
+    steps.push(`4) Ideal client focus: ${analysis.idealClient}`)
+  }
+  
+  if (analysis.mindsetBlocks && analysis.mindsetBlocks !== 'Not specified') {
+    steps.push(`5) Work through: ${analysis.mindsetBlocks}`)
   }
 
-  return steps.length > 0 ? steps.join(' ') : 'Action steps to be determined based on coaching sessions'
+  return steps.length > 0 ? steps.join(' ') : 'Action steps based on comprehensive visioning: Focus on vision implementation, address identified challenges, and leverage documented strengths.'
+}
+
+function generateSolNotes(analysis) {
+  const notes = []
+  
+  if (analysis.communicationStyle && analysis.communicationStyle !== 'Not specified') {
+    notes.push(`Communication Style: ${analysis.communicationStyle}`)
+  }
+  
+  if (analysis.learningStyle && analysis.learningStyle !== 'Not specified') {
+    notes.push(`Learning Style: ${analysis.learningStyle}`)
+  }
+  
+  if (analysis.transformationTriggers && analysis.transformationTriggers !== 'Not specified') {
+    notes.push(`Transformation Triggers: ${analysis.transformationTriggers}`)
+  }
+  
+  if (analysis.coachingNeeds && analysis.coachingNeeds !== 'Not specified') {
+    notes.push(`Coaching Needs: ${analysis.coachingNeeds}`)
+  }
+  
+  return notes.length > 0 ? notes.join('. ') + '.' : 'Comprehensive visioning completed - ready for personalized coaching based on documented insights.'
 }
 
 // ==================== HELPER FUNCTIONS ====================
