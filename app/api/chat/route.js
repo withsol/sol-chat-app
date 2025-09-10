@@ -65,68 +65,53 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
       )
     )
     
-    const hasBusinessPlanContent = userMessage.length > 400 && (
-      message.includes('future vision') ||
-      message.includes('top 3 goals') ||
-      message.includes('ideal client') ||
-      message.includes('marketing system') ||
-      message.includes('sales system') ||
-      message.includes('aligned business plan') ||
-      message.includes('business plan') ||
-      message.includes('here is my business plan') ||
-      message.includes('here\'s my business plan') ||
-      message.includes('my business plan') ||
-      message.includes('completed business plan') ||
-      (userMessage.length > 600 && 
-        (message.includes('vision') && message.includes('goals') && message.includes('offers'))
-      )
-    )
-    
     if (hasVisioningContent) {
-      console.log('🎯 Detected visioning content, processing...')
+      console.log('🎯 Detected visioning content, processing inline...')
       
       try {
-        // FIXED: Use the correct Vercel URL construction
-        const baseUrl = process.env.VERCEL_URL 
-          ? `https://${process.env.VERCEL_URL}` 
-          : (process.env.NEXT_PUBLIC_APP_URL || 'https://sol-chat-app.vercel.app')
+        // PROCESS VISIONING DIRECTLY HERE (no API call)
+        const visioningAnalysis = await analyzeVisioningDocumentInline(userMessage)
         
-        console.log('🎯 Using base URL:', baseUrl)
+        // CREATE VISIONING ENTRY DIRECTLY
+        const visioningEntry = await createVisioningEntryInline(user.email, userMessage, visioningAnalysis)
         
-        const response = await fetch(`${baseUrl}/api/process-visioning`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: user.email,
-            visioningText: userMessage
-          })
-        })
-        
-        console.log('🎯 API response status:', response.status)
-        
-        if (response.ok) {
-          const result = await response.json()
-          console.log('🎯 SUCCESS - Visioning processing result:', result)
-          
-          return {
-            content: `🎯 Incredible! I've processed your visioning homework and extracted ${result.personalgorithmCount || 0} Personalgorithm™ insights about how you work best. 
+        // UPDATE USER PROFILE DIRECTLY  
+        const profileUpdates = {
+          'Current Vision': visioningAnalysis.vision || '',
+          'Current Goals': visioningAnalysis.goals || '',
+          'Current State': visioningAnalysis.currentState || ''
+        }
 
-I can see your business is focused on ${result.extractedInsights?.industry || 'your industry'} and your vision is coming together beautifully. Your ideal client clarity and business goals are now part of my understanding of you.
+        if (visioningAnalysis.tags) {
+          const existingProfile = await getUserProfileInline(user.email)
+          const existingTags = existingProfile?.['Tags'] || ''
+          profileUpdates['Tags'] = existingTags ? `${existingTags}, ${visioningAnalysis.tags}` : visioningAnalysis.tags
+        }
 
-What feels most important to focus on first from everything you've shared?`,
-            hasVisioningGuidance: true
-          }
-        } else {
-          const errorText = await response.text()
-          console.error('🔍 API ERROR Response:', errorText)
-          
-          return {
-            content: `I can see you're sharing your visioning homework with me! I'm processing the insights you've shared. Based on what I can see about your business vision and goals, what's the most important thing you want to focus on right now?`,
-            hasVisioningGuidance: true
+        await updateUserProfileInline(user.email, profileUpdates)
+        
+        // CREATE PERSONALGORITHM ENTRIES DIRECTLY
+        let personalgorithmCount = 0
+        if (visioningAnalysis.personalgorithmInsights?.length > 0) {
+          for (const insight of visioningAnalysis.personalgorithmInsights) {
+            const created = await createPersonalgorithmEntryNew(user.email, insight, ['visioning-derived', 'intake'])
+            if (created) personalgorithmCount++
           }
         }
+
+        console.log('✅ Inline visioning processing completed')
+
+        return {
+          content: `🎯 Incredible! I've processed your visioning homework and extracted ${personalgorithmCount} Personalgorithm™ insights about how you work best. 
+
+I can see your business is focused on ${visioningAnalysis.industry || 'your industry'} and your vision is coming together beautifully. Your ideal client clarity and business goals are now part of my understanding of you.
+
+What feels most important to focus on first from everything you've shared?`,
+          hasVisioningGuidance: true
+        }
+        
       } catch (error) {
-        console.error('🔍 FETCH ERROR:', error)
+        console.error('Inline visioning processing error:', error)
         return {
           content: `Thank you for sharing your comprehensive visioning work! I can see the depth of thought you've put into this. What's the main area you'd like my support with based on everything you've shared?`,
           hasVisioningGuidance: true
@@ -134,49 +119,37 @@ What feels most important to focus on first from everything you've shared?`,
       }
     }
     
+    // Handle business plan content similarly
+    const hasBusinessPlanContent = userMessage.length > 400 && (
+      message.includes('future vision') ||
+      message.includes('top 3 goals') ||
+      message.includes('ideal client') ||
+      message.includes('marketing system') ||
+      message.includes('sales system') ||
+      message.includes('aligned business plan') ||
+      message.includes('business plan')
+    )
+    
     if (hasBusinessPlanContent) {
-      console.log('💼 Detected business plan content, processing...')
+      console.log('💼 Detected business plan content, processing inline...')
       
-      try {
-        const businessPlanData = {
-          futureVision: extractSection(userMessage, ['future vision', 'vision']),
-          topGoals: extractSection(userMessage, ['top 3 goals', 'goals']),
-          challenges: extractSection(userMessage, ['challenges', 'problems']),
-          idealClient: extractSection(userMessage, ['ideal client', 'target client']),
-          currentOffers: extractSection(userMessage, ['offers', 'services', 'current offers']),
-          marketingSystem: extractSection(userMessage, ['marketing system', 'marketing']),
-          salesSystem: extractSection(userMessage, ['sales system', 'sales'])
-        }
-        
-        // FIXED: Use the correct Vercel URL construction
-        const baseUrl = process.env.VERCEL_URL 
-          ? `https://${process.env.VERCEL_URL}` 
-          : (process.env.NEXT_PUBLIC_APP_URL || 'https://sol-chat-app.vercel.app')
-        
-        const response = await fetch(`${baseUrl}/api/process-business-plan`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: user.email,
-            businessPlanData: businessPlanData
-          })
-        })
-        
-        if (response.ok) {
-          const result = await response.json()
-          return {
-            content: `💼 Excellent! I've processed your Aligned Business Plan and added the strategic insights to your Personalgorithm™. I can see your business vision and goals clearly now.
-
-Based on your plan, what's the most important focus area for the next 30 days?`,
-            hasVisioningGuidance: true
-          }
-        }
-      } catch (error) {
-        console.error('Business plan processing error:', error)
+      const businessPlanData = {
+        futureVision: extractSection(userMessage, ['future vision', 'vision']),
+        topGoals: extractSection(userMessage, ['top 3 goals', 'goals']),
+        challenges: extractSection(userMessage, ['challenges', 'problems']),
+        idealClient: extractSection(userMessage, ['ideal client', 'target client']),
+        currentOffers: extractSection(userMessage, ['offers', 'services', 'current offers']),
+        marketingSystem: extractSection(userMessage, ['marketing system', 'marketing']),
+        salesSystem: extractSection(userMessage, ['sales system', 'sales'])
       }
       
+      // Process business plan inline
+      await createBusinessPlanEntryInline(user.email, businessPlanData)
+      
       return {
-        content: `I can see you're sharing your business plan with me! Thank you for the strategic context. What's the most important area you want to focus on from your plan?`,
+        content: `💼 Excellent! I've processed your Aligned Business Plan and added the strategic insights to your Personalgorithm™. I can see your business vision and goals clearly now.
+
+Based on your plan, what's the most important focus area for the next 30 days?`,
         hasVisioningGuidance: true
       }
     }
@@ -186,8 +159,6 @@ Based on your plan, what's the most important focus area for the next 30 days?`,
       message.includes('help with visioning') || 
       message.includes('work on visioning') ||
       message.includes('need help with vision') ||
-      message.includes('want to do visioning') ||
-      message.includes('ready for visioning') ||
       (message.includes('visioning') && message.includes('?'))
     )
     
@@ -210,6 +181,212 @@ Which approach feels right for you?`,
     
   } catch (error) {
     console.error('Error in visioning guidance:', error)
+    return null
+  }
+}
+
+// ADD THESE INLINE HELPER FUNCTIONS TO YOUR CHAT ROUTE:
+
+async function analyzeVisioningDocumentInline(visioningText) {
+  try {
+    const analysisPrompt = `You are Sol™ analyzing comprehensive visioning homework. Extract key information:
+
+VISIONING DOCUMENT:
+"${visioningText}"
+
+Extract information and respond in JSON format:
+{
+  "businessName": "extracted business name or 'Not specified'",
+  "industry": "their industry/niche",
+  "vision": "comprehensive vision statement",
+  "goals": "specific 1-year goals",
+  "currentState": "current business situation",
+  "personalgorithmInsights": [
+    "insight about their decision-making patterns",
+    "insight about their communication style",
+    "insight about what drives their transformation"
+  ],
+  "tags": "industry, business-stage, personality-traits"
+}`
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4-turbo-preview',
+        max_tokens: 800,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: analysisPrompt }]
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Analysis failed: ${response.status}`)
+    }
+
+    const result = await response.json()
+    const analysis = result.choices[0].message.content
+
+    // Parse JSON response
+    try {
+      const jsonMatch = analysis.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0])
+      }
+    } catch (parseError) {
+      console.error('Failed to parse analysis as JSON:', parseError)
+    }
+
+    // Fallback
+    return {
+      businessName: 'Not specified',
+      industry: 'Not specified',
+      vision: 'Detailed visioning homework completed',
+      goals: 'Business goals documented',
+      currentState: 'Current business state documented',
+      personalgorithmInsights: [
+        'Completed comprehensive visioning homework - demonstrates commitment to structured business planning',
+        'Provided extensive business context showing self-awareness and strategic thinking'
+      ],
+      tags: 'visioning-complete, business-planning, strategic-thinking'
+    }
+
+  } catch (error) {
+    console.error('Error analyzing visioning document:', error)
+    return {
+      businessName: 'Not specified',
+      industry: 'Not specified', 
+      vision: 'Visioning analysis completed',
+      goals: 'Goals documented',
+      currentState: 'Current state documented',
+      personalgorithmInsights: ['Shared comprehensive visioning content'],
+      tags: 'visioning-complete'
+    }
+  }
+}
+
+async function createVisioningEntryInline(email, visioningText, analysis) {
+  try {
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) return null
+
+    const visioningId = `vis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Visioning`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          'Visioning ID': visioningId,
+          'User ID': [userRecordId],
+          'Date of Submission': new Date().toISOString(),
+          'Summary of Visioning': `Business: ${analysis.businessName} | Industry: ${analysis.industry} | Vision: ${analysis.vision?.substring(0, 100)}...`,
+          'Visioning Homework - Text Format': visioningText,
+          'Tags': analysis.tags || 'visioning-completed'
+        }
+      })
+    })
+
+    if (response.ok) {
+      const result = await response.json()
+      console.log('✅ Visioning entry created:', result.id)
+      return result
+    }
+    return null
+  } catch (error) {
+    console.error('Error creating visioning entry:', error)
+    return null
+  }
+}
+
+async function createBusinessPlanEntryInline(email, planData) {
+  try {
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) return null
+
+    const planId = `abp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned Business® Plans`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          'AB Plan ID': planId,
+          'User ID': [userRecordId],
+          'Date Submitted': new Date().toISOString(),
+          'Future Vision': planData.futureVision || '',
+          'Top 3 Goals': planData.topGoals || '',
+          'Ideal Client': planData.idealClient || '',
+          'Marketing System': planData.marketingSystem || '',
+          'Sales System': planData.salesSystem || ''
+        }
+      })
+    })
+
+    if (response.ok) {
+      const result = await response.json()
+      console.log('✅ Business plan entry created:', result.id)
+      return result
+    }
+    return null
+  } catch (error) {
+    console.error('Error creating business plan entry:', error)
+    return null
+  }
+}
+
+async function getUserProfileInline(email) {
+  try {
+    const encodedEmail = encodeURIComponent(email)
+    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`, {
+      headers: { 'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}` }
+    })
+    if (response.ok) {
+      const data = await response.json()
+      return data.records.length > 0 ? data.records[0].fields : null
+    }
+    return null
+  } catch (error) {
+    console.error('Error getting user profile:', error)
+    return null
+  }
+}
+
+async function updateUserProfileInline(email, updates) {
+  try {
+    const findResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodeURIComponent(email)}"`, {
+      headers: { 'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}` }
+    })
+    if (!findResponse.ok) return null
+    const findData = await findResponse.json()
+    if (findData.records.length === 0) return null
+
+    const recordId = findData.records[0].id
+    const updateResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users/${recordId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ fields: updates })
+    })
+
+    if (updateResponse.ok) {
+      console.log('✅ User profile updated')
+      return await updateResponse.json()
+    }
+    return null
+  } catch (error) {
+    console.error('Error updating user profile:', error)
     return null
   }
 }
