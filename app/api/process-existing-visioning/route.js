@@ -30,18 +30,12 @@ export async function POST(request) {
       if (response.ok) {
         const record = await response.json()
         visioningRecords = [record]
+      } else {
+        console.error('Failed to fetch visioning record:', response.status)
       }
     } else {
-      // Get user record ID first, then find visioning records
-      const userRecordId = await getUserRecordId(email)
-      if (!userRecordId) {
-        return NextResponse.json({ 
-          error: 'User not found' 
-        }, { status: 404 })
-      }
-      
-      // FIXED: Search by linked User ID field, not User ID text field
-      const filterFormula = encodeURIComponent(`FIND("${userRecordId}", ARRAYJOIN({User ID}))>0`)
+      // FIXED: Search by email directly since User ID is stored as text
+      const filterFormula = encodeURIComponent(`{User ID} = "${email}"`)
       const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Visioning?filterByFormula=${filterFormula}`, {
         headers: {
           'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
@@ -52,12 +46,19 @@ export async function POST(request) {
       if (response.ok) {
         const data = await response.json()
         visioningRecords = data.records
+        console.log(`Found ${data.records.length} visioning records for ${email}`)
+      } else {
+        console.error('Failed to fetch visioning records:', response.status)
       }
     }
 
     if (visioningRecords.length === 0) {
       return NextResponse.json({ 
-        error: 'No visioning homework found' 
+        error: 'No visioning homework found',
+        debug: {
+          searchedFor: email || visioningId,
+          searchType: email ? 'email' : 'visioningId'
+        }
       }, { status: 404 })
     }
 
@@ -71,11 +72,8 @@ export async function POST(request) {
         const fields = record.fields
         const visioningText = fields['Visioning Homework - Text Format'] || ''
         
-        // FIXED: Get user email properly from linked field
-        let userEmail = email
-        if (!userEmail && fields['User ID'] && fields['User ID'].length > 0) {
-          userEmail = await getUserEmailFromRecordId(fields['User ID'][0])
-        }
+        // Get user email - it's stored directly in the User ID field as text
+        const userEmail = email || fields['User ID']
         
         if (!visioningText) {
           console.log('No text content found in visioning record:', record.id)
@@ -113,13 +111,17 @@ export async function POST(request) {
           profileUpdates['Tags'] = allTags.join(', ')
         }
 
-        await updateUserProfile(userEmail, profileUpdates)
+        // Update user profile
+        const profileUpdateResult = await updateUserProfile(userEmail, profileUpdates)
+        console.log('Profile update result:', profileUpdateResult ? 'Success' : 'Failed')
         
         // Create Personalgorithm entries from analysis
         if (analysis.personalgorithmInsights?.length > 0) {
           for (const insight of analysis.personalgorithmInsights) {
-            await createPersonalgorithmEntryNew(userEmail, insight, ['visioning-analysis', 'existing-data'])
-            personalgorithmCount++
+            const personalgorithmResult = await createPersonalgorithmEntryNew(userEmail, insight, ['visioning-analysis', 'existing-data'])
+            if (personalgorithmResult) {
+              personalgorithmCount++
+            }
           }
         }
 
@@ -143,7 +145,8 @@ export async function POST(request) {
       errors: errors.length > 0 ? errors : undefined,
       records: visioningRecords.map(r => ({
         id: r.id,
-        summary: r.fields['Summary of Visioning'] || 'No summary'
+        summary: r.fields['Summary of Visioning'] || 'No summary',
+        userEmail: r.fields['User ID']
       }))
     })
 
@@ -296,7 +299,7 @@ function createFallbackAnalysis(visioningText) {
   }
 }
 
-// ==================== ENHANCED UPDATE FUNCTIONS ====================
+// ==================== UPDATE FUNCTIONS ====================
 
 async function updateVisioningRecord(recordId, analysis) {
   try {
@@ -381,26 +384,6 @@ function generateSolNotes(analysis) {
 
 // ==================== HELPER FUNCTIONS ====================
 
-async function getUserEmailFromRecordId(recordId) {
-  try {
-    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users/${recordId}`, {
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (response.ok) {
-      const record = await response.json()
-      return record.fields['User ID'] // This should be the email
-    }
-    return null
-  } catch (error) {
-    console.error('Error getting user email from record ID:', error)
-    return null
-  }
-}
-
 async function getUserProfile(email) {
   try {
     const encodedEmail = encodeURIComponent(email)
@@ -420,29 +403,6 @@ async function getUserProfile(email) {
 
   } catch (error) {
     console.error('Error getting user profile:', error)
-    return null
-  }
-}
-
-async function getUserRecordId(email) {
-  try {
-    const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) return null
-
-    const data = await response.json()
-    return data.records.length > 0 ? data.records[0].id : null
-
-  } catch (error) {
-    console.error('Error getting user record ID:', error)
     return null
   }
 }
@@ -498,7 +458,7 @@ async function updateUserProfile(email, updates) {
 
 async function createPersonalgorithmEntryNew(email, notes, tags = ['auto-generated']) {
   try {
-    // First get user record ID for linking
+    // Get user record ID for linking to Personalgorithm table
     const userRecordId = await getUserRecordId(email)
     if (!userRecordId) {
       console.error('Cannot create Personalgorithm entry - user record not found')
@@ -536,6 +496,29 @@ async function createPersonalgorithmEntryNew(email, notes, tags = ['auto-generat
     
   } catch (error) {
     console.error('Error creating Personalgorithm entry:', error)
+    return null
+  }
+}
+
+async function getUserRecordId(email) {
+  try {
+    const encodedEmail = encodeURIComponent(email)
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) return null
+
+    const data = await response.json()
+    return data.records.length > 0 ? data.records[0].id : null
+
+  } catch (error) {
+    console.error('Error getting user record ID:', error)
     return null
   }
 }
