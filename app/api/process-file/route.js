@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server'
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js'
+import * as pdfjsLib from 'pdfjs-dist'
 
 export async function POST(request) {
   console.log('=== FILE PROCESSING API ===')
@@ -25,42 +25,45 @@ export async function POST(request) {
     let extractedText = ''
     
    // Handle different file types
-if (file.type === 'application/pdf') {
-  console.log('Processing PDF with pdfjs-dist...')
-  
-  try {
-    // Load the PDF document
-    const loadingTask = pdfjsLib.getDocument({
-      data: new Uint8Array(buffer),
-      useSystemFonts: true
-    })
+    if (file.type === 'application/pdf') {
+    console.log('Processing PDF with pdfjs-dist...')
     
-    const pdfDocument = await loadingTask.promise
-    console.log('PDF loaded, pages:', pdfDocument.numPages)
-    
-    let fullText = ''
-    
-    // Extract text from each page
-    for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-      const page = await pdfDocument.getPage(pageNum)
-      const textContent = await page.getTextContent()
-      
-      const pageText = textContent.items
-        .map(item => ('str' in item) ? item.str : '')
-        .join(' ')
-      
-      fullText += pageText + '\n'
+    try {
+        // Set worker source for serverless environment
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`
+        
+        // Load the PDF document
+        const loadingTask = pdfjsLib.getDocument({
+        data: new Uint8Array(buffer),
+        useSystemFonts: true
+        })
+        
+        const pdfDocument = await loadingTask.promise
+        console.log('PDF loaded, pages:', pdfDocument.numPages)
+        
+        let fullText = ''
+        
+        // Extract text from each page
+        for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+        const page = await pdfDocument.getPage(pageNum)
+        const textContent = await page.getTextContent()
+        
+        const pageText = textContent.items
+            .map(item => ('str' in item) ? item.str : '')
+            .join(' ')
+        
+        fullText += pageText + '\n'
+        }
+        
+        extractedText = fullText.trim()
+        console.log('Extracted text length:', extractedText.length)
+        
+    } catch (pdfError) {
+        console.error('PDF processing error:', pdfError)
+        return NextResponse.json({ 
+        error: 'Failed to process PDF. Please ensure it\'s a valid PDF file or try converting to text.' 
+        }, { status: 400 })
     }
-    
-    extractedText = fullText.trim()
-    console.log('Extracted text length:', extractedText.length)
-    
-  } catch (pdfError) {
-    console.error('PDF processing error:', pdfError)
-    return NextResponse.json({ 
-      error: 'Failed to process PDF. Please ensure it\'s a valid PDF file or try converting to text.' 
-    }, { status: 400 })
-  }
   
 } else if (file.type === 'text/plain') {
   extractedText = buffer.toString('utf-8')
