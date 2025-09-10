@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server'
-import * as pdfjsLib from 'pdfjs-dist'
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js'
 
 export async function POST(request) {
   console.log('=== FILE PROCESSING API ===')
@@ -24,20 +24,20 @@ export async function POST(request) {
     
     let extractedText = ''
     
-   // Handle different file types
+  // Handle different file types
     if (file.type === 'application/pdf') {
     console.log('Processing PDF with pdfjs-dist...')
     
     try {
-        // Set worker source for serverless environment
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`
+        // Set worker source for Node.js environment
+        pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.js')
         
         // Load the PDF document
         const loadingTask = pdfjsLib.getDocument({
         data: new Uint8Array(buffer),
         useSystemFonts: true
         })
-        
+    
         const pdfDocument = await loadingTask.promise
         console.log('PDF loaded, pages:', pdfDocument.numPages)
         
