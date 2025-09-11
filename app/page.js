@@ -38,41 +38,43 @@ export default function SolApp() {
   }, [])
 
   const checkAuthentication = async () => {
-    try {
-      const storedUser = localStorage.getItem('sol_user')
-      if (!storedUser) {
-        router.push('/login')
-        return
-      }
-
-      const userData = JSON.parse(storedUser)
-      
-      const response = await fetch('/api/auth/thrivecart', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: userData.email })
-      })
-
-      const result = await response.json()
-      
-      if (result.hasActiveSubscription) {
-        setUser({
-          email: userData.email,
-          name: userData.email.split('@')[0],
-          personalgorithm: 'building',
-          subscription: 'active'
-        })
-        setIsAuthenticated(true)
-        testConnections()
-      } else {
-        localStorage.removeItem('sol_user')
-        router.push('/login')
-      }
-    } catch (error) {
-      console.error('Authentication check failed:', error)
+  try {
+    const storedUser = localStorage.getItem('sol_user')
+    if (!storedUser) {
       router.push('/login')
+      return
     }
+
+    const userData = JSON.parse(storedUser)
+    
+    // Skip the API call for users who just logged in successfully
+    // Check if login was recent (within last 24 hours)
+    const loginTime = new Date(userData.loginTime)
+    const now = new Date()
+    const hoursSinceLogin = (now - loginTime) / (1000 * 60 * 60)
+    
+    if (hoursSinceLogin < 24) {
+      // Recent login, trust the stored authentication
+      setUser({
+        email: userData.email,
+        name: userData.email.split('@')[0],
+        personalgorithm: 'building',
+        subscription: 'active'
+      })
+      setIsAuthenticated(true)
+      testConnections()
+      return
+    }
+    
+    // For older logins, you might want to redirect to login
+    // or implement a refresh token system later
+    router.push('/login')
+    
+  } catch (error) {
+    console.error('Authentication check failed:', error)
+    router.push('/login')
   }
+}
 
   const handleLogout = () => {
     localStorage.removeItem('sol_user')
