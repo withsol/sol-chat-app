@@ -8,147 +8,71 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Email required' }, { status: 400 })
     }
 
-    console.log('Checking Sol access for:', email)
+    console.log('=== SOL AUTHENTICATION DEBUG ===')
+    console.log('Email:', email)
+    console.log('BETA_MODE:', process.env.BETA_MODE)
+    console.log('AIRTABLE_BASE_ID:', process.env.AIRTABLE_BASE_ID ? 'SET' : 'NOT SET')
+    console.log('AIRTABLE_API_KEY:', process.env.AIRTABLE_API_KEY ? 'SET' : 'NOT SET')
     
-    // Check if we're in beta mode
     const isBetaMode = process.env.BETA_MODE === 'true'
+    console.log('Is Beta Mode:', isBetaMode)
     
-    // Always check Airtable first (for both beta and production)
+    // Check Airtable
+    const airtableUrl = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${email}"`
+    console.log('Airtable URL:', airtableUrl)
+    
     try {
-      const airtableResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${email}"`, {
+      const airtableResponse = await fetch(airtableUrl, {
         headers: {
           'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}`,
           'Content-Type': 'application/json'
         }
       })
 
+      console.log('Airtable Response Status:', airtableResponse.status)
+      
       if (airtableResponse.ok) {
         const airtableData = await airtableResponse.json()
+        console.log('Airtable Data:', JSON.stringify(airtableData, null, 2))
         
         if (airtableData.records && airtableData.records.length > 0) {
           const user = airtableData.records[0].fields
           const membershipPlan = user['Membership Plan']
           
-          console.log('User found in Airtable with plan:', membershipPlan)
+          console.log('Found user with membership plan:', membershipPlan)
           
-          // In beta mode, allow beta testers
           if (isBetaMode) {
-            const betaPlans = ['Test', 'Founding Member', 'Founding Member Life', 'Beta', 'Active']
-            const isBetaTester = betaPlans.some(plan => 
-              membershipPlan && membershipPlan.toLowerCase().includes(plan.toLowerCase())
-            )
-            
-            if (isBetaTester) {
-              console.log('Beta tester access granted for:', email)
-              return NextResponse.json({
-                hasActiveSubscription: true,
-                email,
-                accessType: 'beta_tester',
-                membershipPlan
-              })
-            }
-          } else {
-            // Production mode - only allow active subscriptions
-            const productionPlans = ['Active', 'Subscription', 'Paid']
-            const hasActiveSubscription = productionPlans.some(plan => 
-              membershipPlan && membershipPlan.toLowerCase().includes(plan.toLowerCase())
-            )
-            
-            if (hasActiveSubscription) {
-              console.log('Production access granted for:', email)
-              return NextResponse.json({
-                hasActiveSubscription: true,
-                email,
-                accessType: 'airtable_subscriber',
-                membershipPlan
-              })
-            }
-          }
-        }
-      }
-    } catch (airtableError) {
-      console.error('Airtable check failed:', airtableError)
-    }
-
-    // Only try Thrivecart if Airtable didn't grant access AND we're not in beta mode
-    if (!isBetaMode) {
-      try {
-        console.log('Checking Thrivecart for:', email)
-        const apiUrl = `https://api.thrivecart.com/learn/v1/students/${encodeURIComponent(email)}/enrollments`
-        
-        const thrivecartResponse = await fetch(apiUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${process.env.THRIVECART_API_KEY}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-        })
-
-        if (thrivecartResponse.ok) {
-          const enrollmentData = await thrivecartResponse.json()
-          
-          const hasSolEnrollment = enrollmentData.enrollments && 
-            enrollmentData.enrollments.some(enrollment => 
-              (enrollment.course_name === 'Sol™' || 
-               enrollment.course_name === 'The Art of Becoming' || 
-               enrollment.course_title?.includes('Sol')) &&
-              enrollment.status === 'active'
-            )
-
-          if (hasSolEnrollment) {
-            // Add them to Airtable for future reference
-            await updateUserInAirtable(email, 'Active Subscription')
-            
+            // Just allow any user in Airtable during beta
+            console.log('BETA MODE: Granting access')
             return NextResponse.json({
               hasActiveSubscription: true,
               email,
-              accessType: 'thrivecart_subscription'
+              accessType: 'beta_tester',
+              membershipPlan
             })
           }
         } else {
-          console.error('Thrivecart API error:', thrivecartResponse.status)
+          console.log('No user found in Airtable')
         }
-      } catch (thrivecartError) {
-        console.error('Thrivecart check failed:', thrivecartError)
+      } else {
+        const errorText = await airtableResponse.text()
+        console.error('Airtable Error:', airtableResponse.status, errorText)
       }
+    } catch (airtableError) {
+      console.error('Airtable Request Failed:', airtableError)
     }
 
-    // No access found
+    console.log('Access denied')
     return NextResponse.json({ 
       hasActiveSubscription: false, 
-      error: isBetaMode 
-        ? 'No beta access found. Please contact support if you should have access.'
-        : 'No active subscription found. Please ensure you have an active subscription to The Art of Becoming program.'
+      error: 'No access found. Please contact support.'
     }, { status: 401 })
 
   } catch (error) {
     console.error('Authentication error:', error)
     return NextResponse.json({ 
       hasActiveSubscription: false, 
-      error: 'Authentication check failed. Please try again.' 
+      error: 'Authentication check failed.' 
     }, { status: 500 })
-  }
-}
-
-async function updateUserInAirtable(email, membershipPlan) {
-  try {
-    await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        fields: {
-          'User ID': email,
-          'First Name': email.split('@')[0],
-          'Membership Plan': membershipPlan,
-          'Date Joined': new Date().toISOString().split('T')[0]
-        }
-      })
-    })
-  } catch (error) {
-    console.error('Error adding user to Airtable:', error)
   }
 }
