@@ -12,7 +12,7 @@ export async function POST(request) {
     console.log('Email:', email)
     console.log('BETA_MODE:', process.env.BETA_MODE)
     console.log('AIRTABLE_BASE_ID:', process.env.AIRTABLE_BASE_ID ? 'SET' : 'NOT SET')
-    console.log('AIRTABLE_API_KEY:', process.env.AIRTABLE_API_KEY ? 'SET' : 'NOT SET')
+    console.log('AIRTABLE_TOKEN:', process.env.AIRTABLE_TOKEN ? 'SET' : 'NOT SET') // Changed this line
     
     const isBetaMode = process.env.BETA_MODE === 'true'
     console.log('Is Beta Mode:', isBetaMode)
@@ -24,7 +24,7 @@ export async function POST(request) {
     try {
       const airtableResponse = await fetch(airtableUrl, {
         headers: {
-          'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}`,
+          'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`, // Changed this line
           'Content-Type': 'application/json'
         }
       })
