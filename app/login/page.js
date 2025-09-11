@@ -17,7 +17,6 @@ export default function LoginPage() {
     setError('')
 
     try {
-      // Verify subscription with your authentication API
       const response = await fetch('/api/auth/thrivecart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -27,14 +26,12 @@ export default function LoginPage() {
       const result = await response.json()
 
       if (result.hasActiveSubscription) {
-        // Store user session
         localStorage.setItem('sol_user', JSON.stringify({
           email,
           authenticated: true,
           loginTime: new Date().toISOString()
         }))
         
-        // Redirect to Sol chat
         router.push('/')
       } else {
         setError(result.error || 'Invalid email or password. Please check your credentials and try again.')
@@ -97,9 +94,9 @@ export default function LoginPage() {
           }}>Your AI Business Partner</p>
         </div>
 
-        <div onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div>
-            <label style={{
+            <label htmlFor="email" style={{
               display: 'block',
               fontSize: '14px',
               fontWeight: '500',
@@ -137,7 +134,7 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label style={{
+            <label htmlFor="password" style={{
               display: 'block',
               fontSize: '14px',
               fontWeight: '500',
@@ -171,12 +168,6 @@ export default function LoginPage() {
               }}
               required
               disabled={isLoading}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  handleLogin(e)
-                }
-              }}
             />
             <p style={{
               marginTop: '8px',
@@ -216,7 +207,7 @@ export default function LoginPage() {
           )}
 
           <button
-            onClick={handleLogin}
+            type="submit"
             disabled={isLoading || !email || !password}
             style={{
               width: '100%',
@@ -248,7 +239,7 @@ export default function LoginPage() {
               <span>Access Sol™</span>
             )}
           </button>
-        </div>
+        </form>
       </div>
       
       <style jsx>{`
