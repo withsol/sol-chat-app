@@ -6,6 +6,7 @@ import { AlertCircle, Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -16,11 +17,11 @@ export default function LoginPage() {
     setError('')
 
     try {
-      // Verify subscription with Thrivecart
+      // Verify subscription with your authentication API
       const response = await fetch('/api/auth/thrivecart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, password })
       })
 
       const result = await response.json()
@@ -36,11 +37,11 @@ export default function LoginPage() {
         // Redirect to Sol chat
         router.push('/')
       } else {
-        setError('No active subscription found. Please ensure you have an active subscription to The Art of Becoming program.')
+        setError(result.error || 'Invalid email or password. Please check your credentials and try again.')
       }
     } catch (error) {
       console.error('Login error:', error)
-      setError('Unable to verify your subscription. Please try again.')
+      setError('Unable to verify your credentials. Please try again.')
     }
 
     setIsLoading(false)
@@ -96,9 +97,9 @@ export default function LoginPage() {
           }}>Your AI Business Partner</p>
         </div>
 
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div>
-            <label htmlFor="email" style={{
+            <label style={{
               display: 'block',
               fontSize: '14px',
               fontWeight: '500',
@@ -113,7 +114,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter the email used for your Sol course enrollment"
+              placeholder="Enter your email address"
               style={{
                 width: '100%',
                 padding: '16px 20px',
@@ -133,6 +134,50 @@ export default function LoginPage() {
               required
               disabled={isLoading}
             />
+          </div>
+
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#1e293b',
+              marginBottom: '8px',
+              letterSpacing: '0.025em'
+            }}>
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              style={{
+                width: '100%',
+                padding: '16px 20px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '12px',
+                outline: 'none',
+                fontSize: '16px',
+                fontWeight: '400',
+                color: '#2d3748',
+                background: '#fefefe',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                opacity: isLoading ? 0.6 : 1,
+                boxSizing: 'border-box'
+              }}
+              required
+              disabled={isLoading}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleLogin(e)
+                }
+              }}
+            />
             <p style={{
               marginTop: '8px',
               fontSize: '14px',
@@ -140,7 +185,7 @@ export default function LoginPage() {
               fontWeight: '300',
               lineHeight: '1.5'
             }}>
-              Use the same email address you used to enroll in the Sol course.
+              Use the password provided to you for beta access.
             </p>
           </div>
 
@@ -171,8 +216,8 @@ export default function LoginPage() {
           )}
 
           <button
-            type="submit"
-            disabled={isLoading || !email}
+            onClick={handleLogin}
+            disabled={isLoading || !email || !password}
             style={{
               width: '100%',
               backgroundColor: '#475569',
@@ -183,10 +228,10 @@ export default function LoginPage() {
               fontSize: '16px',
               fontWeight: '500',
               letterSpacing: '0.025em',
-              cursor: (!email || isLoading) ? 'not-allowed' : 'pointer',
+              cursor: (!email || !password || isLoading) ? 'not-allowed' : 'pointer',
               boxShadow: '0 10px 15px -3px rgba(71, 85, 105, 0.3)',
               transition: 'all 0.2s ease',
-              opacity: (!email || isLoading) ? 0.6 : 1,
+              opacity: (!email || !password || isLoading) ? 0.6 : 1,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -196,18 +241,14 @@ export default function LoginPage() {
           >
             {isLoading ? (
               <>
-                <Loader2 style={{ 
-                  width: '20px', 
-                  height: '20px',
-                  animation: 'spin 1s linear infinite'
-                }} />
-                <span>Verifying course access...</span>
+                <Loader2 style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite' }} />
+                <span>Verifying access...</span>
               </>
             ) : (
               <span>Access Sol™</span>
             )}
           </button>
-        </form>
+        </div>
       </div>
       
       <style jsx>{`
