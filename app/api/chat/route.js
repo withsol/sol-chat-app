@@ -42,7 +42,22 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
   try {
     const message = userMessage.toLowerCase()
     
-    const hasVisioningContent = userMessage.length > 400 && (
+    // ============================================================
+    // KEY FIX: Only process inline if there's ACTUAL visioning content
+    // NOT if they're just mentioning that they submitted it
+    // ============================================================
+    
+    const isJustMentioning = (
+      message.includes('i just submitted') ||
+      message.includes('i uploaded') ||
+      message.includes('just shared my') ||
+      message.includes('just sent my') ||
+      message === 'i just submitted my visioning homework' ||
+      userMessage.length < 100  // Too short to be actual visioning
+    )
+    
+    // Only detect actual visioning content if it's long AND has key markers
+    const hasVisioningContent = !isJustMentioning && userMessage.length > 800 && (
       message.includes('section one') ||
       message.includes('section two') ||
       message.includes('section three') ||
@@ -54,22 +69,14 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
       message.includes('mission statement') ||
       message.includes('core values') ||
       message.includes('ideal audience member') ||
-      message.includes('what differentiates you') ||
-      message.includes('here is my visioning') ||
-      message.includes('here\'s my visioning') ||
-      message.includes('my visioning homework') ||
-      message.includes('completed visioning') ||
-      message.includes('visioning document') ||
-      (userMessage.length > 800 && 
-        (message.includes('business') && message.includes('goals') && message.includes('client'))
-      )
+      message.includes('what differentiates you')
     )
     
     if (hasVisioningContent) {
-      console.log('🎯 Detected visioning content, processing inline...')
+      console.log('🎯 Detected ACTUAL visioning content, processing inline...')
       
       try {
-        // PROCESS VISIONING DIRECTLY HERE (no API call)
+        // PROCESS VISIONING DIRECTLY HERE
         const visioningAnalysis = await analyzeVisioningDocumentInline(userMessage)
         
         // CREATE VISIONING ENTRY DIRECTLY
@@ -101,20 +108,21 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
 
         console.log('✅ Inline visioning processing completed')
 
-        // Let Sol respond naturally with full context
-        return null  // This allows normal chat flow to continue with enhanced context
+        // ============================================================
+        // CHANGED: Return null so Sol responds naturally with context
+        // instead of returning a templated message
+        // ============================================================
+        return null
         
       } catch (error) {
         console.error('Inline visioning processing error:', error)
-        return {
-          content: `Thank you for sharing your comprehensive visioning work! I can see the depth of thought you've put into this. What's the main area you'd like my support with based on everything you've shared?`,
-          hasVisioningGuidance: true
-        }
+        // On error, let normal chat flow continue
+        return null
       }
     }
     
     // Handle business plan content similarly
-    const hasBusinessPlanContent = userMessage.length > 400 && (
+    const hasBusinessPlanContent = !isJustMentioning && userMessage.length > 400 && (
       message.includes('future vision') ||
       message.includes('top 3 goals') ||
       message.includes('ideal client') ||
@@ -140,15 +148,11 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
       // Process business plan inline
       await createBusinessPlanEntryInline(user.email, businessPlanData)
       
-      return {
-        content: `💼 Excellent! I've processed your Aligned Business Plan and added the strategic insights to your Personalgorithm™. I can see your business vision and goals clearly now.
-
-Based on your plan, what's the most important focus area for the next 30 days?`,
-        hasVisioningGuidance: true
-      }
+      // Return null to let Sol respond naturally
+      return null
     }
     
-    // Show options only for explicit requests
+    // Show options only for explicit help requests
     const needsVisioningHelp = !userContextData.visioningData && (
       message.includes('help with visioning') || 
       message.includes('work on visioning') ||
@@ -158,19 +162,19 @@ Based on your plan, what's the most important focus area for the next 30 days?`,
     
     if (needsVisioningHelp) {
       return {
-        content: `I'd love to help you with your visioning! Here are your options:
-
-**Option 1: Share Your Completed Visioning** - Paste your comprehensive visioning homework directly here.
-
-**Option 2: Work Through It Together** - I can guide you through the key questions.
-
-**Option 3: Use the Airtable Form** - https://airtable.com/appbxBGiXlAatoYsV/pagxUmPB9uh1c9Tqz/form
-
-Which approach feels right for you?`,
+        content: `I'd love to help you with your visioning!
+        
+        ##If you have a completed visioning document##, simply copy and paste all the text from that document into a message here. I'll log that all and use it to support your next steps.
+        
+        ##If you don't have a complete visioning document## or want to ##create an updated one##, you can grab a blank visioning document here to fill out: https://docs.google.com/document/d/1aZyrYmKmQa_rJ8bXRk2uAYkdw7ywrTLSaGMFx1Ajv1s/copy?tab=t.0#heading=h.8qxg3wpztspl
+        
+        Once you have that complete, copy and paste it all here in a message and we'll be set to bring your vision to life!'
+        ,
         hasVisioningGuidance: true
       }
     }
     
+    // Default: return null to allow normal chat flow
     return null
     
   } catch (error) {
