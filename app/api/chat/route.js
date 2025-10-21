@@ -539,184 +539,255 @@ Be conversational and natural. Match their communication style. Avoid generic co
 }
 
 export async function POST(request) {
-  console.log('=== CHAT API V3.2 - WITH VISIONING & BUSINESS PLAN DETECTION ===')
+  console.log('=== CHAT API STARTED ===')
   
   try {
-    const { message, user, conversationHistory } = await request.json()
+    // Parse request body
+    let message, user, conversationHistory
+    try {
+      const body = await request.json()
+      message = body.message
+      user = body.user
+      conversationHistory = body.conversationHistory || []
+      console.log('✅ Request parsed successfully')
+      console.log('📝 Message length:', message?.length || 0)
+      console.log('👤 User:', user?.email || 'unknown')
+    } catch (parseError) {
+      console.error('❌ Failed to parse request:', parseError)
+      return NextResponse.json({
+        response: "I had trouble understanding your message. Could you try again?",
+        error: parseError.message
+      }, { status: 400 })
+    }
     
-    console.log('Chat request for user:', user.email)
-    console.log('User message length:', message.length)
+    if (!message || !user?.email) {
+      console.error('❌ Missing required fields')
+      return NextResponse.json({
+        response: "Missing required information. Please refresh and try again.",
+      }, { status: 400 })
+    }
 
-    // SAFER CONTEXT FETCH
+    console.log('Chat request for user:', user.email)
+
+    // Generate IDs
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const timestamp = new Date().toISOString()
+
+    // Fetch user context with extreme safety
     let userContextData = {
       userProfile: null,
       personalgorithmData: [],
       businessPlans: [],
       weeklyCheckins: [],
       visioningData: null,
+      solNotes: [],
+      coachingMethods: [],
       contextSummary: "Context loading..."
     }
     
     try {
-      console.log('=== ATTEMPTING CONTEXT FETCH ===')
+      console.log('=== FETCHING USER CONTEXT ===')
       userContextData = await fetchUserContextDirect(user.email)
-      console.log('✅ Context fetch successful')
+      console.log('✅ Context fetched:', {
+        hasProfile: !!userContextData.userProfile,
+        personalgorithm: userContextData.personalgorithmData?.length || 0,
+        solNotes: userContextData.solNotes?.length || 0,
+        methods: userContextData.coachingMethods?.length || 0
+      })
     } catch (contextError) {
-      console.error('❌ Context fetch failed, continuing without context:', contextError)
+      console.error('❌ Context fetch failed (continuing anyway):', contextError.message)
     }
     
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    const timestamp = new Date().toISOString()
-
-    // 🎯 CHECK FOR VISIONING/BUSINESS PLAN CONTENT FIRST
-    const visioningGuidance = await handleVisioningGuidance(message, userContextData, user)
-    if (visioningGuidance && visioningGuidance.hasVisioningGuidance) {
-      console.log('✅ Visioning/Business Plan content detected and processed')
-      
-      // Still log this important interaction
-      try {
-        await logToAirtable({
-          messageId,
-          email: user.email,
-          userMessage: message,
-          solResponse: visioningGuidance.content,
-          timestamp,
-          tokensUsed: 0,
-          tags: 'visioning-processed, document-intake',
-          flaggingAnalysis: { shouldFlag: false, reason: '', addToLibrary: true }
-        })
-      } catch (logError) {
-        console.error('❌ Failed to log visioning interaction:', logError)
-      }
-
-      // Update profile
-      try {
-        await updateUserProfile(user.email, {
-          'Last Message Date': timestamp
-        })
-      } catch (profileError) {
-        console.error('❌ Profile update failed:', profileError)
-      }
-
-      return NextResponse.json({
-        response: visioningGuidance.content,
-        tags: 'visioning-processed, document-intake',
-        tokensUsed: 0,
-        debug: {
-          hasContext: !!userContextData.userProfile,
-          visioningProcessed: true,
-          contextSummary: userContextData.contextSummary || 'No context available'
+    // Check for visioning content
+    try {
+      console.log('=== CHECKING FOR VISIONING ===')
+      const visioningGuidance = await handleVisioningGuidance(message, userContextData, user)
+      if (visioningGuidance && visioningGuidance.hasVisioningGuidance) {
+        console.log('✅ Visioning guidance provided')
+        
+        // Try to log this
+        try {
+          await logToAirtable({
+            messageId,
+            email: user.email,
+            userMessage: message,
+            solResponse: visioningGuidance.content,
+            timestamp,
+            tokensUsed: 0,
+            tags: 'visioning-processed',
+            flaggingAnalysis: { shouldFlag: false, reason: '', addToLibrary: false }
+          })
+        } catch (logError) {
+          console.error('❌ Logging failed:', logError.message)
         }
+
+        return NextResponse.json({
+          response: visioningGuidance.content,
+          tags: 'visioning-processed',
+          tokensUsed: 0
+        })
+      }
+    } catch (visioningError) {
+      console.error('❌ Visioning check failed:', visioningError.message)
+    }
+
+    // Generate AI response with EXTREME safety
+    let aiResponse
+    try {
+      console.log('=== GENERATING AI RESPONSE ===')
+      
+      // Build system prompt
+      let systemPrompt
+      try {
+        systemPrompt = buildEnhancedComprehensivePrompt(userContextData, user)
+        console.log('✅ System prompt built')
+      } catch (promptError) {
+        console.error('❌ Prompt build failed, using minimal:', promptError.message)
+        systemPrompt = `You are Sol™, an AI business coach. Keep responses short and natural.`
+      }
+      
+      // Prepare messages
+      const recentContext = conversationHistory.slice(-8).map(msg => ({
+        role: msg.role === 'sol' ? 'assistant' : 'user',
+        content: msg.content
+      }))
+      
+      recentContext.push({
+        role: 'user',
+        content: message
+      })
+      
+      console.log('📤 Calling OpenAI with', recentContext.length, 'messages')
+      
+      // Call OpenAI with retry
+      let attempts = 0
+      let lastError = null
+      
+      while (attempts < 3) {
+        try {
+          console.log(`🔄 Attempt ${attempts + 1}/3`)
+          
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              max_tokens: 500,
+              temperature: 0.7,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                ...recentContext
+              ]
+            })
+          })
+
+          console.log('📥 OpenAI responded with status:', response.status)
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error('❌ OpenAI error:', response.status, errorText)
+            
+            if (response.status === 429 && attempts < 2) {
+              attempts++
+              console.log('⏳ Rate limit, waiting 3s...')
+              await new Promise(resolve => setTimeout(resolve, 3000))
+              continue
+            }
+            
+            throw new Error(`OpenAI error ${response.status}: ${errorText.substring(0, 200)}`)
+          }
+
+          const result = await response.json()
+          console.log('✅ OpenAI success, tokens:', result.usage?.total_tokens || 0)
+          
+          aiResponse = {
+            content: result.choices[0].message.content,
+            tokensUsed: result.usage?.total_tokens || 0,
+            model: 'gpt-4o'
+          }
+          
+          break // Success, exit retry loop
+          
+        } catch (fetchError) {
+          console.error(`❌ Attempt ${attempts + 1} failed:`, fetchError.message)
+          lastError = fetchError
+          
+          if (attempts < 2) {
+            attempts++
+            await new Promise(resolve => setTimeout(resolve, 2000))
+          } else {
+            throw fetchError
+          }
+        }
+      }
+      
+      if (!aiResponse) {
+        throw lastError || new Error('All OpenAI attempts failed')
+      }
+      
+    } catch (aiError) {
+      console.error('❌ AI generation completely failed:', aiError.message)
+      console.error('Stack:', aiError.stack)
+      
+      return NextResponse.json({
+        response: "I'm experiencing technical difficulties right now. Your message was: \"" + message.substring(0, 50) + "...\" - Let me know if you'd like to try again?",
+        error: aiError.message
       })
     }
 
-    // REGULAR AI RESPONSE GENERATION
-    let aiResponse
-    try {
-      console.log('=== ATTEMPTING AI RESPONSE ===')
-      aiResponse = await generatePersonalizedOpenAIResponse(
-        message, 
-        conversationHistory, 
-        userContextData,
-        user
-      )
-      console.log('✅ AI response successful')
-    } catch (aiError) {
-      console.error('❌ AI response failed:', aiError)
-      aiResponse = {
-        content: `I can see your message "${message}" but I'm having some technical difficulties right now. How can I help you today?`,
-        tokensUsed: 0,
-        model: 'fallback'
-      }
-    }
-
-    // SAFER TAG GENERATION
+    // Generate tags (with safety)
     let conversationTags = 'general-support'
     try {
       conversationTags = await generateConversationTags(message, aiResponse.content, userContextData, user)
     } catch (tagError) {
-      console.error('❌ Tag generation failed:', tagError)
+      console.error('❌ Tag generation failed:', tagError.message)
     }
     
-    // SAFER FLAGGING ANALYSIS
-    let flaggingAnalysis = { shouldFlag: false, reason: '', addToLibrary: false }
+    // Log to Airtable (with safety)
     try {
-      flaggingAnalysis = await analyzeFlagging(message, aiResponse.content, userContextData, user)
-    } catch (flagError) {
-      console.error('❌ Flagging analysis failed:', flagError)
-    }
-    
-    // SAFER AIRTABLE LOGGING
-    try {
-      console.log('=== ATTEMPTING AIRTABLE LOGGING ===')
       await logToAirtable({
         messageId,
         email: user.email,
         userMessage: message,
         solResponse: aiResponse.content,
         timestamp,
-        tokensUsed: aiResponse.tokensUsed || 0,
+        tokensUsed: aiResponse.tokensUsed,
         tags: conversationTags,
-        flaggingAnalysis: flaggingAnalysis
+        flaggingAnalysis: { shouldFlag: false, reason: '', addToLibrary: false }
       })
-      console.log('✅ Airtable logging successful')
+      console.log('✅ Logged to Airtable')
     } catch (airtableError) {
-      console.error('❌ Airtable logging failed:', airtableError)
+      console.error('❌ Airtable logging failed (continuing):', airtableError.message)
     }
 
-    // PERSONALGORITHM™ ANALYSIS TRIGGER
-    if (aiResponse.content && !aiResponse.content.includes('technical difficulties')) {
-      triggerPersonalgorithmAnalysis(user.email, message, aiResponse.content, conversationHistory)
-    }
-
-    // SOL AUTO-UPDATE SYSTEM
-    if (aiResponse.content && !aiResponse.content.includes('technical difficulties')) {
-      setTimeout(() => {
-        detectAndPerformUpdates(user.email, message, aiResponse.content, userContextData)
-      }, 1000)
-      
-      const lastMessageDate = userContextData.userProfile?.['Last Message Date']
-      const daysSinceLastMessage = lastMessageDate ? 
-        (Date.now() - new Date(lastMessageDate).getTime()) / (1000 * 60 * 60 * 24) : 7
-      
-      if (daysSinceLastMessage >= 7) {
-        setTimeout(() => updateTranscriptDigest(user.email), 2000)
-      }
-    }
-
-    // SAFER PROFILE UPDATE
+    // Update profile (with safety)
     try {
-      await updateUserProfile(user.email, {
-        'Last Message Date': timestamp
-      })
+      await updateUserProfile(user.email, { 'Last Message Date': timestamp })
     } catch (profileError) {
-      console.error('❌ Profile update failed:', profileError)
+      console.error('❌ Profile update failed:', profileError.message)
     }
 
-    console.log('=== SENDING RESPONSE TO USER ===')
+    console.log('=== RETURNING SUCCESSFUL RESPONSE ===')
 
     return NextResponse.json({
       response: aiResponse.content,
       tags: conversationTags,
-      tokensUsed: aiResponse.tokensUsed || 0,
-      debug: {
-        hasContext: !!userContextData.userProfile,
-        contextSummary: userContextData.contextSummary || 'No context available'
-      }
+      tokensUsed: aiResponse.tokensUsed
     })
 
   } catch (error) {
-    console.error('❌ CRITICAL CHAT API ERROR:', error)
+    console.error('❌❌❌ CRITICAL ERROR IN CHAT API:', error)
+    console.error('Error message:', error.message)
     console.error('Error stack:', error.stack)
     
     return NextResponse.json({
-      response: "I'm experiencing some technical difficulties, but I'm still here to help. Could you try sending your message again?",
+      response: "Something went wrong. Please try refreshing the page and sending your message again.",
       error: error.message,
-      debug: {
-        timestamp: new Date().toISOString(),
-        errorType: error.name
-      }
-    }, { status: 200 })
+      stack: error.stack?.substring(0, 500)
+    }, { status: 500 })
   }
 }
 
