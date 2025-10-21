@@ -417,83 +417,125 @@ function extractSection(text, keywords) {
 // ==================== ENHANCED PROMPT BUILDING ====================
 
 function buildEnhancedComprehensivePrompt(userContextData, user) {
-  let systemPrompt = `You are Sol™, created by Kelsey Kerslake. You are an emotionally intelligent AI business partner and coach.
+  try {
+    console.log('🔧 DIAGNOSTIC: Starting prompt build')
+    console.log('🔧 Sol Notes available:', userContextData.solNotes?.length || 0)
+    console.log('🔧 Coaching Methods available:', userContextData.coachingMethods?.length || 0)
+    console.log('🔧 Personalgorithm entries:', userContextData.personalgorithmData?.length || 0)
+    
+    let systemPrompt = `You are Sol™, created by Kelsey Kerslake. You are an emotionally intelligent AI business partner and coach.
 
 USER: ${user.email}
 MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
 `
 
-  // Add user-specific context
-  if (userContextData.userProfile) {
-    const profile = userContextData.userProfile
-    
-    if (profile['Current Vision']) {
-      systemPrompt += `\nCURRENT VISION: ${profile['Current Vision']}`
-    }
-    if (profile['Current State']) {
-      systemPrompt += `\nCURRENT STATE: ${profile['Current State']}`
-    }
-    if (profile['Current Goals']) {
-      systemPrompt += `\nCURRENT GOALS: ${profile['Current Goals']}`
-    }
-    if (profile['Coaching Style Match']) {
-      systemPrompt += `\nCOACHING STYLE THAT WORKS: ${profile['Coaching Style Match']}`
-    }
-    systemPrompt += "\n"
-  }
-
-  // Add Personalgorithm insights (ALL of them, not limited)
-  if (userContextData.personalgorithmData?.length > 0) {
-    systemPrompt += "\nPERSONALGORITHM™ INSIGHTS (How this user transforms best):\n"
-    userContextData.personalgorithmData.forEach((insight, i) => {
-      systemPrompt += `${i + 1}. ${insight.notes}\n`
-    })
-  }
-
-  // Add visioning context
-  if (userContextData.visioningData) {
-    systemPrompt += "\nVISIONING INSIGHTS:\n"
-    if (userContextData.visioningData['Summary of Visioning']) {
-      systemPrompt += `${userContextData.visioningData['Summary of Visioning']}\n`
-    }
-  }
-
-  // Add business plan context
-  if (userContextData.businessPlans?.length > 0) {
-    const latestPlan = userContextData.businessPlans[0]
-    systemPrompt += "\nBUSINESS CONTEXT:\n"
-    if (latestPlan['Future Vision']) {
-      systemPrompt += `Vision: ${latestPlan['Future Vision']}\n`
-    }
-    if (latestPlan['Top 3 Goals']) {
-      systemPrompt += `Goals: ${latestPlan['Top 3 Goals']}\n`
-    }
-  }
-
-  // ============================================================
-  // THIS IS THE KEY CHANGE: Pull from Sol™ table instead of hardcoding
-  // ============================================================
-  if (userContextData.solNotes?.length > 0) {
-    systemPrompt += "\nYOUR COACHING APPROACH & GUIDELINES:\n"
-    userContextData.solNotes.forEach((note, i) => {
-      systemPrompt += `${note.note}\n\n`
-    })
-  }
-
-  // Add relevant coaching methods from Aligned Business® Method table
-  if (userContextData.coachingMethods?.length > 0) {
-    systemPrompt += "\nRELEVANT COACHING METHODS:\n"
-    userContextData.coachingMethods.forEach((method, i) => {
-      if (method.content) {
-        systemPrompt += `${method.name}: ${method.content}\n\n`
+    // Add user-specific context
+    if (userContextData.userProfile) {
+      const profile = userContextData.userProfile
+      console.log('🔧 Adding user profile context')
+      
+      if (profile['Current Vision']) {
+        systemPrompt += `\nCURRENT VISION: ${profile['Current Vision']}`
       }
-    })
-  }
+      if (profile['Current State']) {
+        systemPrompt += `\nCURRENT STATE: ${profile['Current State']}`
+      }
+      if (profile['Current Goals']) {
+        systemPrompt += `\nCURRENT GOALS: ${profile['Current Goals']}`
+      }
+      if (profile['Coaching Style Match']) {
+        systemPrompt += `\nCOACHING STYLE: ${profile['Coaching Style Match']}`
+      }
+      systemPrompt += "\n"
+    }
 
-  console.log('System prompt length:', systemPrompt.length, 'characters')
-  console.log('Estimated tokens:', Math.ceil(systemPrompt.length / 4))
-  
-  return systemPrompt
+    // Add Personalgorithm insights (ALL of them)
+    if (userContextData.personalgorithmData?.length > 0) {
+      console.log('🔧 Adding Personalgorithm insights')
+      systemPrompt += "\nPERSONALGORITHM™ (How this user transforms):\n"
+      userContextData.personalgorithmData.forEach((insight, i) => {
+        if (insight && insight.notes) {
+          systemPrompt += `${i + 1}. ${insight.notes}\n`
+        }
+      })
+      systemPrompt += "\n"
+    }
+
+    // Add visioning context
+    if (userContextData.visioningData) {
+      console.log('🔧 Adding visioning context')
+      systemPrompt += "\nVISIONING:\n"
+      if (userContextData.visioningData['Summary of Visioning']) {
+        systemPrompt += `${userContextData.visioningData['Summary of Visioning']}\n\n`
+      }
+    }
+
+    // Add business plan context
+    if (userContextData.businessPlans?.length > 0) {
+      console.log('🔧 Adding business plan context')
+      const latestPlan = userContextData.businessPlans[0]
+      systemPrompt += "\nBUSINESS CONTEXT:\n"
+      if (latestPlan['Future Vision']) {
+        systemPrompt += `Vision: ${latestPlan['Future Vision']}\n`
+      }
+      if (latestPlan['Top 3 Goals']) {
+        systemPrompt += `Goals: ${latestPlan['Top 3 Goals']}\n`
+      }
+      systemPrompt += "\n"
+    }
+
+    // ============================================================
+    // KEY SECTION: Pull from Sol™ table
+    // ============================================================
+    if (userContextData.solNotes?.length > 0) {
+      console.log('🔧 Adding Sol™ brain notes')
+      systemPrompt += "\nHOW TO COACH:\n"
+      userContextData.solNotes.forEach((note) => {
+        if (note && note.note) {
+          systemPrompt += `${note.note}\n\n`
+        }
+      })
+    } else {
+      // FALLBACK if Sol table is empty
+      console.log('⚠️ WARNING: No Sol™ notes found - using fallback')
+      systemPrompt += `\nHOW TO COACH:
+Keep responses short (2-4 sentences) and personally resonant. Ask permission before sharing insights or going deep. Only give detailed responses when explicitly asked. After big shares: reflect what you notice + ask ONE question. Never information dump unsolicited.
+
+Be conversational and natural. Match their communication style. Avoid generic coach-speak like "truly inspiring" or "leverage your strengths." Be specific about THEM.
+`
+    }
+
+    // Add relevant coaching methods
+    if (userContextData.coachingMethods?.length > 0) {
+      console.log('🔧 Adding coaching methods')
+      systemPrompt += "\nRELEVANT METHODS:\n"
+      userContextData.coachingMethods.forEach((method) => {
+        if (method && method.content) {
+          systemPrompt += `${method.name}: ${method.content}\n\n`
+        }
+      })
+    }
+
+    const promptLength = systemPrompt.length
+    const estimatedTokens = Math.ceil(promptLength / 4)
+    
+    console.log('✅ Prompt built successfully')
+    console.log('📏 Length:', promptLength, 'characters')
+    console.log('🎯 Estimated tokens:', estimatedTokens)
+    
+    if (estimatedTokens > 6000) {
+      console.warn('⚠️ WARNING: Prompt is very long - may cause issues')
+    }
+    
+    return systemPrompt
+    
+  } catch (error) {
+    console.error('❌ ERROR building prompt:', error)
+    console.error('Error stack:', error.stack)
+    
+    // Return minimal safe prompt
+    return `You are Sol™, an AI business coach. Keep responses short and natural. Ask questions. Get consent before going deep.`
+  }
 }
 
 export async function POST(request) {
