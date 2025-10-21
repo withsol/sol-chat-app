@@ -49,7 +49,6 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
       userMessage.length < 100
     )
     
-    // Detect actual visioning content
     const hasVisioningContent = !isJustMentioning && userMessage.length > 800 && (
       message.includes('section one') ||
       message.includes('section two') ||
@@ -62,12 +61,7 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
     if (hasVisioningContent) {
       console.log('🎯 Detected visioning content - processing asynchronously')
       
-      // ============================================================
-      // KEY FIX: Process in the BACKGROUND without blocking the response
-      // ============================================================
-      
-      // Trigger background processing (don't await - let it run async)
-      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/process-visioning`, {
+      fetch(`https://sol-chat-app.vercel.app/api/process-visioning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -78,13 +72,9 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
         console.error('Background visioning processing error:', error)
       })
       
-      // Return null immediately so normal chat handles the response
-      // The processing will happen in the background
       return null
     }
     
-    // Only show visioning help if they explicitly ask HOW to do visioning
-    // Don't show if they're just asking about whether Sol has access to it
     const needsVisioningHelp = (
       message.includes('how do i do visioning') || 
       message.includes('how to do visioning') ||
