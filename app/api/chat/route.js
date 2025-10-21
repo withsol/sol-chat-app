@@ -162,14 +162,15 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
     
     if (needsVisioningHelp) {
       return {
-        content: `I'd love to help you with your visioning!
-        
-        ##If you have a completed visioning document##, simply copy and paste all the text from that document into a message here. I'll log that all and use it to support your next steps.
-        
-        ##If you don't have a complete visioning document## or want to ##create an updated one##, you can grab a blank visioning document here to fill out: https://docs.google.com/document/d/1aZyrYmKmQa_rJ8bXRk2uAYkdw7ywrTLSaGMFx1Ajv1s/copy?tab=t.0#heading=h.8qxg3wpztspl
-        
-        Once you have that complete, copy and paste it all here in a message and we'll be set to bring your vision to life!'
-        ,
+        content: `I'd love to help you with your visioning! Here are your options:
+
+**Option 1: Share Your Completed Visioning** - Paste your comprehensive visioning homework directly here.
+
+**Option 2: Work Through It Together** - I can guide you through the key questions.
+
+**Option 3: Use the Airtable Form** - https://airtable.com/appbxBGiXlAatoYsV/pagxUmPB9uh1c9Tqz/form
+
+Which approach feels right for you?`,
         hasVisioningGuidance: true
       }
     }
