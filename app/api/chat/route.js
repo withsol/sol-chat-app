@@ -1175,7 +1175,8 @@ async function fetchSolNotesDirect() {
   try {
     console.log('Fetching Sol™ notes/brain content')
     
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Sol™?maxRecords=20&sort[0][field]=Date Submitted&sort[0][direction]=desc`
+    // Simpler query without sort that might be causing 422
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Sol™?maxRecords=50`
     
     const response = await fetch(url, {
       headers: {
@@ -1185,25 +1186,44 @@ async function fetchSolNotesDirect() {
     })
 
     if (!response.ok) {
+      const errorText = await response.text()
       console.error('❌ Sol™ notes fetch failed:', response.status)
+      console.error('❌ Error details:', errorText)
+      
+      // Return empty array instead of crashing
       return []
     }
 
     const data = await response.json()
     
-    const solNotes = data.records.map(record => ({
-      solId: record.fields['Sol ID'],
-      note: record.fields['Note'],
-      dateSubmitted: record.fields['Date Submitted'],
-      tags: record.fields['Tags'] || '',
-      link: record.fields['Link']
-    })).filter(note => note.note) // Only include notes with content
+    if (!data.records || data.records.length === 0) {
+      console.log('⚠️ No Sol™ notes found in Airtable')
+      return []
+    }
+    
+    const solNotes = data.records
+      .map(record => {
+        try {
+          return {
+            solId: record.fields['Sol ID'] || `sol_${Date.now()}`,
+            note: record.fields['Note'] || '',
+            dateSubmitted: record.fields['Date Submitted'],
+            tags: record.fields['Tags'] || '',
+            link: record.fields['Link']
+          }
+        } catch (recordError) {
+          console.error('Error processing Sol note record:', recordError)
+          return null
+        }
+      })
+      .filter(note => note && note.note && note.note.trim().length > 0)
 
     console.log('✅ Found', solNotes.length, 'Sol™ brain notes')
     return solNotes
 
   } catch (error) {
     console.error('❌ Error fetching Sol™ notes:', error)
+    // Return empty array so app doesn't crash
     return []
   }
 }
@@ -1577,8 +1597,8 @@ async function generatePersonalizedOpenAIResponse(userMessage, conversationHisto
       }
     }
 
-    const useGPT4 = shouldUseGPT4(userMessage, userContextData)
-    const model = useGPT4 ? 'gpt-4-turbo-preview' : 'gpt-3.5-turbo'
+    // CHANGED: Always use GPT-4o (the best model for emotional intelligence)
+    const model = 'gpt-4o'
     
     console.log(`Using ${model} for response generation`)
 
@@ -1592,42 +1612,80 @@ async function generatePersonalizedOpenAIResponse(userMessage, conversationHisto
       content: userMessage
     })
 
-    // USE THE NEW ENHANCED PROMPT BUILDING
     let contextPrompt = buildEnhancedComprehensivePrompt(userContextData, user)
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: model,
-        max_tokens: useGPT4 ? 800 : 400,
-        temperature: 0.7,
-        messages: [
-          {
-            role: 'system',
-            content: contextPrompt
-          },
-          ...recentContext
-        ]
-      })
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error('OpenAI API error:', errorData)
-      throw new Error(`OpenAI API error: ${response.status}`)
-    }
-
-    const result = await response.json()
+    // Rate limit retry logic
+    let attempts = 0
+    let lastError = null
     
-    return {
-      content: result.choices[0].message.content,
-      tokensUsed: result.usage.total_tokens,
-      model: model
+    while (attempts < 3) {
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: model,
+            max_tokens: 600, // Slightly reduced for cost efficiency
+            temperature: 0.7,
+            messages: [
+              {
+                role: 'system',
+                content: contextPrompt
+              },
+              ...recentContext
+            ]
+          })
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          
+          // If rate limit (429), wait and retry
+          if (response.status === 429) {
+            attempts++
+            console.log(`⏳ Rate limit hit, attempt ${attempts}/3, waiting...`)
+            
+            if (attempts < 3) {
+              // Wait 3 seconds before retry
+              await new Promise(resolve => setTimeout(resolve, 3000))
+              continue
+            }
+          }
+          
+          lastError = new Error(`OpenAI API error: ${response.status}`)
+          console.error('OpenAI API error:', errorData)
+          throw lastError
+        }
+
+        const result = await response.json()
+        
+        console.log('✅ Response generated successfully')
+        console.log('📊 Tokens used:', result.usage.total_tokens)
+        
+        return {
+          content: result.choices[0].message.content,
+          tokensUsed: result.usage.total_tokens,
+          model: model
+        }
+        
+      } catch (fetchError) {
+        lastError = fetchError
+        
+        if (fetchError.message.includes('429') && attempts < 2) {
+          attempts++
+          console.log(`⏳ Retrying after error, attempt ${attempts}/3`)
+          await new Promise(resolve => setTimeout(resolve, 3000))
+          continue
+        }
+        
+        break
+      }
     }
+    
+    throw lastError || new Error('Failed after 3 attempts')
 
   } catch (error) {
     console.error('OpenAI response error:', error)
@@ -1639,20 +1697,11 @@ async function generatePersonalizedOpenAIResponse(userMessage, conversationHisto
   }
 }
 
+
 function shouldUseGPT4(userMessage, userContextData) {
-  const gpt4Triggers = [
-    'vision', 'goal', 'future', 'transform', 'stuck', 'confused', 'breakthrough',
-    'strategy', 'business plan', 'revenue', 'pricing', 'client', 'launch', 'identity'
-  ]
-  
-  const complexityIndicators = [
-    userMessage.length > 150,
-    gpt4Triggers.some(trigger => userMessage.toLowerCase().includes(trigger)),
-    userContextData.personalgorithmData?.length > 3,
-    userContextData.businessPlans?.length > 0
-  ]
-  
-  return complexityIndicators.some(indicator => indicator)
+  // Always use GPT-4o for Sol - it's the best for emotional intelligence
+  // and it's actually cheaper than the old turbo model
+  return true
 }
 
 // ==================== OTHER FUNCTIONS ====================
