@@ -449,7 +449,7 @@ MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
   // Add Personalgorithm insights
   if (userContextData.personalgorithmData?.length > 0) {
     systemPrompt += "PERSONALGORITHM™ INSIGHTS (How this user transforms best):\n"
-    userContextData.personalgorithmData.slice(0, 5).forEach((insight, i) => {
+    userContextData.personalgorithmData.forEach((insight, i) => {
       systemPrompt += `${i + 1}. ${insight.notes}\n`
     })
     systemPrompt += "\n"
@@ -458,7 +458,7 @@ MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
   // Add relevant coaching methods based on user's current state
   if (userContextData.coachingMethods?.length > 0) {
     systemPrompt += "RELEVANT COACHING METHODS FROM KELSEY'S ALIGNED BUSINESS® METHOD:\n"
-    userContextData.coachingMethods.slice(0, 3).forEach((method, i) => {
+    userContextData.coachingMethods.forEach((method, i) => {
       if (method.content) {
         systemPrompt += `${method.name}: ${method.content}\n`
       }
@@ -469,7 +469,7 @@ MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
   // Add Sol's brain insights for general coaching approach
   if (userContextData.solNotes?.length > 0) {
     systemPrompt += "SOL'S COACHING BRAIN (Kelsey's insights for all coaching):\n"
-    userContextData.solNotes.slice(0, 5).forEach((note, i) => {
+    userContextData.solNotes.forEach((note, i) => {
       if (note.note) {
         systemPrompt += `- ${note.note}\n`
       }
@@ -1554,7 +1554,7 @@ function buildEnhancedContextSummary(results) {
   
   if (results.personalgorithmData && results.personalgorithmData.length > 0) {
     summary += `🧠 KEY PERSONALGORITHM™ INSIGHTS:\n`
-    results.personalgorithmData.slice(0, 3).forEach((insight, index) => {
+    results.personalgorithmData.forEach((insight, index) => {
       summary += `${index + 1}. ${insight.notes}\n`
     })
     summary += "\n"
@@ -1606,7 +1606,7 @@ async function generatePersonalizedOpenAIResponse(userMessage, conversationHisto
     
     console.log(`Using ${model} for response generation`)
 
-    const recentContext = conversationHistory.slice(-6).map(msg => ({
+    const recentContext = conversationHistory.slice(-10).map(msg => ({
       role: msg.role === 'sol' ? 'assistant' : 'user',
       content: msg.content
     }))

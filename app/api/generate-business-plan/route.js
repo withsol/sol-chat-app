@@ -212,7 +212,7 @@ Tags: ${userProfile['Tags'] || 'None'}
   // Add Personalgorithm insights
   if (personalgorithm.length > 0) {
     prompt += `PERSONALGORITHM INSIGHTS (How this person operates best):\n`
-    personalgorithm.slice(0, 8).forEach((insight, i) => {
+    personalgorithm.forEach((insight, i) => {
       prompt += `${i + 1}. ${insight['Personalgorithm™ Notes']}\n`
     })
     prompt += '\n'

@@ -91,14 +91,14 @@ async function generateSimplePersonalgorithmInsight(userMessage, solResponse) {
 USER: "${userMessage}"
 SOL: "${solResponse}"
 
-Look for ONE specific pattern about how this person:
-- Communicates (word choice, punctuation, emphasis, style)
-- Processes emotions or information
-- Makes decisions or approaches problems
-- Responds to different types of support or feedback
-- Expresses their needs or challenges
+Create a detailed insight (4-6 sentences) that captures:
+1. HOW this person communicates (word choice, emphasis, punctuation patterns)
+2. HOW they process information or emotions (analytical, feeling-first, visual, need time, etc.)
+3. WHAT triggers transformation or action for them specifically
+4. HOW they respond to different types of support or feedback
+5. Any unique patterns in their decision-making or problem-solving approach
 
-Create ONE specific insight (2-3 sentences max) about this person's unique patterns. Focus on HOW they operate, not WHAT they said.
+Be SPECIFIC to this individual. Avoid generic observations. Focus on the nuances that make their way of operating unique.
 
 If no significant pattern emerges, respond with "NONE".
 
