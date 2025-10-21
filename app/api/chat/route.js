@@ -42,122 +42,53 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
   try {
     const message = userMessage.toLowerCase()
     
-    // ============================================================
-    // KEY FIX: Only process inline if there's ACTUAL visioning content
-    // NOT if they're just mentioning that they submitted it
-    // ============================================================
-    
     const isJustMentioning = (
       message.includes('i just submitted') ||
       message.includes('i uploaded') ||
       message.includes('just shared my') ||
-      message.includes('just sent my') ||
-      message === 'i just submitted my visioning homework' ||
-      userMessage.length < 100  // Too short to be actual visioning
+      userMessage.length < 100
     )
     
-    // Only detect actual visioning content if it's long AND has key markers
+    // Detect actual visioning content
     const hasVisioningContent = !isJustMentioning && userMessage.length > 800 && (
       message.includes('section one') ||
       message.includes('section two') ||
-      message.includes('section three') ||
       message.includes('basic brand analysis') ||
       message.includes('audience analysis') ||
-      message.includes('competitive analysis') ||
-      message.includes('free write') ||
-      message.includes('current reality') ||
-      message.includes('mission statement') ||
-      message.includes('core values') ||
-      message.includes('ideal audience member') ||
-      message.includes('what differentiates you')
+      message.includes('here is my visioning') ||
+      message.includes('here is my latest visioning')
     )
     
     if (hasVisioningContent) {
-      console.log('🎯 Detected ACTUAL visioning content, processing inline...')
+      console.log('🎯 Detected visioning content - processing asynchronously')
       
-      try {
-        // PROCESS VISIONING DIRECTLY HERE
-        const visioningAnalysis = await analyzeVisioningDocumentInline(userMessage)
-        
-        // CREATE VISIONING ENTRY DIRECTLY
-        const visioningEntry = await createVisioningEntryInline(user.email, userMessage, visioningAnalysis)
-        
-        // UPDATE USER PROFILE DIRECTLY  
-        const profileUpdates = {
-          'Current Vision': visioningAnalysis.vision || '',
-          'Current Goals': visioningAnalysis.goals || '',
-          'Current State': visioningAnalysis.currentState || ''
-        }
-
-        if (visioningAnalysis.tags) {
-          const existingProfile = await getUserProfileInline(user.email)
-          const existingTags = existingProfile?.['Tags'] || ''
-          profileUpdates['Tags'] = existingTags ? `${existingTags}, ${visioningAnalysis.tags}` : visioningAnalysis.tags
-        }
-
-        await updateUserProfileInline(user.email, profileUpdates)
-        
-        // CREATE PERSONALGORITHM ENTRIES DIRECTLY
-        let personalgorithmCount = 0
-        if (visioningAnalysis.personalgorithmInsights?.length > 0) {
-          for (const insight of visioningAnalysis.personalgorithmInsights) {
-            const created = await createPersonalgorithmEntryNew(user.email, insight, ['visioning-derived', 'intake'])
-            if (created) personalgorithmCount++
-          }
-        }
-
-        console.log('✅ Inline visioning processing completed')
-
-        // ============================================================
-        // CHANGED: Return null so Sol responds naturally with context
-        // instead of returning a templated message
-        // ============================================================
-        return null
-        
-      } catch (error) {
-        console.error('Inline visioning processing error:', error)
-        // On error, let normal chat flow continue
-        return null
-      }
-    }
-    
-    // Handle business plan content similarly
-    const hasBusinessPlanContent = !isJustMentioning && userMessage.length > 400 && (
-      message.includes('future vision') ||
-      message.includes('top 3 goals') ||
-      message.includes('ideal client') ||
-      message.includes('marketing system') ||
-      message.includes('sales system') ||
-      message.includes('aligned business plan') ||
-      message.includes('business plan')
-    )
-    
-    if (hasBusinessPlanContent) {
-      console.log('💼 Detected business plan content, processing inline...')
+      // ============================================================
+      // KEY FIX: Process in the BACKGROUND without blocking the response
+      // ============================================================
       
-      const businessPlanData = {
-        futureVision: extractSection(userMessage, ['future vision', 'vision']),
-        topGoals: extractSection(userMessage, ['top 3 goals', 'goals']),
-        challenges: extractSection(userMessage, ['challenges', 'problems']),
-        idealClient: extractSection(userMessage, ['ideal client', 'target client']),
-        currentOffers: extractSection(userMessage, ['offers', 'services', 'current offers']),
-        marketingSystem: extractSection(userMessage, ['marketing system', 'marketing']),
-        salesSystem: extractSection(userMessage, ['sales system', 'sales'])
-      }
+      // Trigger background processing (don't await - let it run async)
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/process-visioning`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          visioningText: userMessage
+        })
+      }).catch(error => {
+        console.error('Background visioning processing error:', error)
+      })
       
-      // Process business plan inline
-      await createBusinessPlanEntryInline(user.email, businessPlanData)
-      
-      // Return null to let Sol respond naturally
+      // Return null immediately so normal chat handles the response
+      // The processing will happen in the background
       return null
     }
     
-    // Show options only for explicit help requests
-    const needsVisioningHelp = !userContextData.visioningData && (
-      message.includes('help with visioning') || 
-      message.includes('work on visioning') ||
-      message.includes('need help with vision') ||
-      (message.includes('visioning') && message.includes('?'))
+    // Only show visioning help if they explicitly ask HOW to do visioning
+    // Don't show if they're just asking about whether Sol has access to it
+    const needsVisioningHelp = (
+      message.includes('how do i do visioning') || 
+      message.includes('how to do visioning') ||
+      message.includes('help me with visioning homework')
     )
     
     if (needsVisioningHelp) {
@@ -175,7 +106,6 @@ Which approach feels right for you?`,
       }
     }
     
-    // Default: return null to allow normal chat flow
     return null
     
   } catch (error) {
