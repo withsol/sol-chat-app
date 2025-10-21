@@ -101,14 +101,8 @@ async function handleVisioningGuidance(userMessage, userContextData, user) {
 
         console.log('✅ Inline visioning processing completed')
 
-        return {
-          content: `🎯 Incredible! I've processed your visioning homework and extracted ${personalgorithmCount} Personalgorithm™ insights about how you work best. 
-
-I can see your business is focused on ${visioningAnalysis.industry || 'your industry'} and your vision is coming together beautifully. Your ideal client clarity and business goals are now part of my understanding of you.
-
-What feels most important to focus on first from everything you've shared?`,
-          hasVisioningGuidance: true
-        }
+        // Let Sol respond naturally with full context
+        return null  // This allows normal chat flow to continue with enhanced context
         
       } catch (error) {
         console.error('Inline visioning processing error:', error)

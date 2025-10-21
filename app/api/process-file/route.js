@@ -88,8 +88,11 @@ export async function POST(request) {
         return NextResponse.json({
           success: true,
           type: 'visioning',
-          message: `🎯 Visioning homework processed successfully! I've extracted your business vision, goals, ideal client details, and created ${result.personalgorithmCount || 0} Personalgorithm™ insights. Your profile has been updated with your vision and I can now coach you with much more personalized support.`,
-          ...result
+          visioningProcessed: true,
+          extractedData: {
+          businessName: result.extractedInsights?.businessName,
+          industry: result.extractedInsights?.industry
+          }
         })
       } catch (visioningError) {
         console.error('Visioning processing error:', visioningError)

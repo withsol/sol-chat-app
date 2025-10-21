@@ -55,19 +55,15 @@ export async function POST(request) {
     console.log('✅ Enhanced visioning processing completed')
 
     return NextResponse.json({
-      success: true,
-      visioningEntry: visioningEntry,
-      profileUpdates: profileUpdates,
-      personalgorithmInsights: personalgorithmResult.entriesCreated,
-      extractedInsights: {
-        businessName: visioningAnalysis.businessName,
-        industry: visioningAnalysis.industry,
-        vision: visioningAnalysis.vision,
-        challenges: visioningAnalysis.challenges,
-        strengths: visioningAnalysis.strengths
-      },
-      message: `Visioning processed! Created ${personalgorithmResult.entriesCreated} sophisticated Personalgorithm™ insights from your homework.`
-    })
+  success: true,
+  visioningProcessed: true,
+  personalgorithmEntriesCreated: personalgorithmResult.entriesCreated,
+  extractedData: {
+    businessName: visioningAnalysis.businessName,
+    industry: visioningAnalysis.industry,
+    vision: visioningAnalysis.vision
+  }
+})
 
   } catch (error) {
     console.error('❌ Enhanced visioning processing error:', error)

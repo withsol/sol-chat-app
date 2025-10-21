@@ -165,20 +165,207 @@ export default function SolApp() {
   }
 
   const handleFileUpload = async (event) => {
-    const file = event.target.files[0]
-    if (!file) return
+  const file = event.target.files[0]
+  if (!file) return
 
-    const fileMessage = {
-      id: `file_${Date.now()}`,
-      role: 'user',
-      content: `📎 Uploaded: ${file.name}`,
-      timestamp: new Date().toISOString(),
-      fileAttachment: file,
-      tags: ['file-upload']
-    }
-    
-    setMessages(prev => [...prev, fileMessage])
+  // Show file upload message
+  const fileMessage = {
+    id: `file_${Date.now()}`,
+    role: 'user',
+    content: `📎 Uploading: ${file.name}...`,
+    timestamp: new Date().toISOString(),
+    tags: ['file-upload']
   }
+  
+  setMessages(prev => [...prev, fileMessage])
+  setIsTyping(true)
+
+  try {
+    // Upload file to backend
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('email', user?.email || 'demo@example.com')
+
+    const response = await fetch('/api/process-file', {
+      method: 'POST',
+      body: formData
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'File upload failed')
+    }
+
+    const result = await response.json()
+    
+    // Update the upload message to show success
+    setMessages(prev => prev.map(msg => 
+      msg.id === fileMessage.id 
+        ? { ...msg, content: `📎 ${file.name} uploaded successfully` }
+        : msg
+    ))
+
+    setIsTyping(false)
+
+    // ============================================================
+    // KEY CHANGE: Instead of showing a templated message from the API,
+    // trigger a NEW chat message so Sol responds naturally
+    // ============================================================
+    
+    if (result.visioningProcessed) {
+      // For visioning documents, trigger natural response
+      setTimeout(async () => {
+        const visioningPrompt = "I just submitted my visioning homework"
+        
+        const userMsg = {
+          id: `msg_${Date.now()}`,
+          role: 'user',
+          content: visioningPrompt,
+          timestamp: new Date().toISOString(),
+          tags: ['visioning-followup']
+        }
+        
+        setMessages(prev => [...prev, userMsg])
+        setIsTyping(true)
+
+        try {
+          const chatResponse = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: visioningPrompt,
+              user: user,
+              conversationHistory: messages
+            })
+          })
+
+          if (chatResponse.ok) {
+            const chatData = await chatResponse.json()
+            const solMessage = {
+              id: `sol_${Date.now()}`,
+              role: 'sol',
+              content: chatData.response,
+              timestamp: new Date().toISOString(),
+              tags: chatData.tags || ['visioning-response']
+            }
+            setMessages(prev => [...prev, solMessage])
+          }
+        } catch (error) {
+          console.error('Error getting Sol response:', error)
+        } finally {
+          setIsTyping(false)
+        }
+      }, 500) // Small delay so user sees the upload success first
+      
+    } else if (result.type === 'business-plan') {
+      // Similar flow for business plans
+      setTimeout(async () => {
+        const planPrompt = "I just uploaded my business plan"
+        
+        const userMsg = {
+          id: `msg_${Date.now()}`,
+          role: 'user',
+          content: planPrompt,
+          timestamp: new Date().toISOString(),
+          tags: ['business-plan-followup']
+        }
+        
+        setMessages(prev => [...prev, userMsg])
+        setIsTyping(true)
+
+        try {
+          const chatResponse = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: planPrompt,
+              user: user,
+              conversationHistory: messages
+            })
+          })
+
+          if (chatResponse.ok) {
+            const chatData = await chatResponse.json()
+            const solMessage = {
+              id: `sol_${Date.now()}`,
+              role: 'sol',
+              content: chatData.response,
+              timestamp: new Date().toISOString(),
+              tags: chatData.tags || ['business-plan-response']
+            }
+            setMessages(prev => [...prev, solMessage])
+          }
+        } catch (error) {
+          console.error('Error getting Sol response:', error)
+        } finally {
+          setIsTyping(false)
+        }
+      }, 500)
+      
+    } else {
+      // For other document types, let Sol respond naturally too
+      setTimeout(async () => {
+        const docPrompt = `I just uploaded a document: ${file.name}`
+        
+        const userMsg = {
+          id: `msg_${Date.now()}`,
+          role: 'user',
+          content: docPrompt,
+          timestamp: new Date().toISOString(),
+          tags: ['document-upload']
+        }
+        
+        setMessages(prev => [...prev, userMsg])
+        setIsTyping(true)
+
+        try {
+          const chatResponse = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: docPrompt,
+              user: user,
+              conversationHistory: messages
+            })
+          })
+
+          if (chatResponse.ok) {
+            const chatData = await chatResponse.json()
+            const solMessage = {
+              id: `sol_${Date.now()}`,
+              role: 'sol',
+              content: chatData.response,
+              timestamp: new Date().toISOString(),
+              tags: chatData.tags || ['document-response']
+            }
+            setMessages(prev => [...prev, solMessage])
+          }
+        } catch (error) {
+          console.error('Error getting Sol response:', error)
+        } finally {
+          setIsTyping(false)
+        }
+      }, 500)
+    }
+
+  } catch (error) {
+    console.error('File upload error:', error)
+    setIsTyping(false)
+    
+    // Show error message
+    const errorMsg = {
+      id: `error_${Date.now()}`,
+      role: 'sol',
+      content: `I had trouble processing that file. ${error.message || 'Please try copying and pasting the content directly, or try a different format.'}`,
+      timestamp: new Date().toISOString(),
+      tags: ['error']
+    }
+    setMessages(prev => [...prev, errorMsg])
+  }
+
+  // Reset file input
+  event.target.value = ''
+}
 
   // Simple formatting function
   const formatMessage = (content) => {

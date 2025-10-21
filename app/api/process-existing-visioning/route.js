@@ -148,15 +148,9 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      message: `Successfully processed ${processedCount} visioning record(s) and created ${personalgorithmCount} Personalgorithm insights.`,
       processedCount,
-      personalgorithmCount,
-      errors: errors.length > 0 ? errors : undefined,
-      records: visioningRecords.map(r => ({
-        id: r.id,
-        summary: r.fields['Summary of Visioning'] || 'No summary',
-        userEmail: r.fields['User ID']
-      }))
+      personalgorithmEntriesCreated: personalgorithmCount,
+      errors: errors.length > 0 ? errors : undefined
     })
 
   } catch (error) {

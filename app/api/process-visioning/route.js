@@ -53,19 +53,14 @@ export async function POST(request) {
     console.log('✅ Visioning document processed successfully')
 
     return NextResponse.json({
-      success: true,
-      visioningEntry: visioningEntry,
-      profileUpdates: profileUpdates,
-      personalgorithmCount: analysis.personalgorithmInsights?.length || 0,
-      extractedInsights: {
-        businessName: analysis.businessName,
-        industry: analysis.industry,
-        vision: analysis.vision,
-        challenges: analysis.challenges,
-        strengths: analysis.strengths
-      },
-      message: 'Visioning document processed successfully! Your Personalgorithm™ is now being built from your insights.'
-    })
+  success: true,
+  visioningProcessed: true,
+  extractedData: {
+    businessName: analysis.businessName,
+    industry: analysis.industry,
+    businessStage: analysis.businessStage
+  }
+})
 
   } catch (error) {
     console.error('❌ Visioning processing error:', error)
