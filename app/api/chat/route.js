@@ -814,7 +814,7 @@ async function logToAirtable(messageData) {
   }
 }
 
-function // TEMPORARILY DISABLED to avoid rate limits
+// TEMPORARILY DISABLED to avoid rate limits
 // queuePersonalgorithmAnalysis(user.email, message, aiResponse.content, conversationHistory) {
   // This happens SILENTLY in background - user never knows
   setTimeout(async () => {
@@ -840,7 +840,7 @@ function // TEMPORARILY DISABLED to avoid rate limits
       // Fail silently - user never knows
     }
   }, 2000)
-}
+
 
 async function generateConversationTags(userMessage, solResponse) {
   try {
