@@ -437,7 +437,7 @@ function triggerBackgroundVisioningProcessing(email, visioningText) {
   // Call your existing separate processing route
   // DON'T await - let it process in background
   const url = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-  fetch(`${url}/api/process-visioning`, {
+ fetch(`${url}/api/process-visioning-enhanced`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, visioningText })
