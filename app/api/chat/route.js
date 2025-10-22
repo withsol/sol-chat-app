@@ -704,148 +704,61 @@ USER: ${user.email}
 
 `
 
-  // ==================== PRIMARY: PERSONALGORITHM™ ====================
+  // ==================== CRITICAL CONTEXT ONLY ====================
   
+  // LIMIT Personalgorithm™ to top 10 most recent
   if (userContextData.personalgorithmData?.length > 0) {
-    systemPrompt += `=== PRIMARY INTELLIGENCE: THIS PERSON'S PERSONALGORITHM™ ===\n`
-    systemPrompt += `This is your MOST IMPORTANT guide for supporting this user.\n`
-    systemPrompt += `Every response must be filtered through these patterns FIRST:\n\n`
-    
-    // Group patterns by type
-    const patterns = groupPersonalgorithmPatterns(userContextData.personalgorithmData)
-    
-    if (patterns.communication.length > 0) {
-      systemPrompt += `Their Communication & Language Patterns:\n`
-      patterns.communication.forEach(p => systemPrompt += `- ${p.notes}\n`)
-      systemPrompt += `\n`
-    }
-    
-    if (patterns.transformation.length > 0) {
-      systemPrompt += `What Actually Creates Transformation for Them:\n`
-      patterns.transformation.forEach(p => systemPrompt += `- ${p.notes}\n`)
-      systemPrompt += `\n`
-    }
-    
-    if (patterns.decision.length > 0) {
-      systemPrompt += `How They Make Decisions:\n`
-      patterns.decision.forEach(p => systemPrompt += `- ${p.notes}\n`)
-      systemPrompt += `\n`
-    }
-    
-    if (patterns.emotional.length > 0) {
-      systemPrompt += `Their Emotional & Nervous System Patterns:\n`
-      patterns.emotional.forEach(p => systemPrompt += `- ${p.notes}\n`)
-      systemPrompt += `\n`
-    }
-    
-    if (patterns.resistance.length > 0) {
-      systemPrompt += `Their Resistance Patterns & Growth Edges:\n`
-      patterns.resistance.forEach(p => systemPrompt += `- ${p.notes}\n`)
-      systemPrompt += `\n`
-    }
-    
-    if (patterns.other.length > 0) {
-      systemPrompt += `Other Key Patterns:\n`
-      patterns.other.forEach(p => systemPrompt += `- ${p.notes}\n`)
-      systemPrompt += `\n`
-    }
-    
-    systemPrompt += `APPLY THESE PATTERNS BY:\n`
-    systemPrompt += `- Matching their communication style naturally\n`
-    systemPrompt += `- Using their transformation triggers strategically\n`
-    systemPrompt += `- Respecting their decision-making process\n`
-    systemPrompt += `- Recognizing their emotional states\n`
-    systemPrompt += `- Anticipating their resistance points\n\n`
+    systemPrompt += `=== HOW THIS PERSON WORKS (Top Patterns) ===\n`
+    const topPatterns = userContextData.personalgorithmData.slice(0, 10)
+    topPatterns.forEach(p => systemPrompt += `- ${p.notes}\n`)
+    systemPrompt += `\n`
   }
 
-  // ==================== SECONDARY: SOL™ BRAIN ====================
-  
+  // LIMIT Sol™ Brain to top 5
   if (userContextData.solBrain?.length > 0) {
-    systemPrompt += `=== SECONDARY: GENERAL OPERATING PRINCIPLES ===\n`
-    userContextData.solBrain.slice(0, 10).forEach(brain => {
+    systemPrompt += `=== GENERAL PRINCIPLES ===\n`
+    userContextData.solBrain.slice(0, 5).forEach(brain => {
       systemPrompt += `${brain.note}\n`
     })
     systemPrompt += `\n`
   }
 
-  // ==================== TERTIARY: ALIGNED BUSINESS® METHOD ====================
-  
+  // LIMIT Coaching Methods to top 3
   if (userContextData.coachingMethods?.length > 0) {
-    systemPrompt += `=== TERTIARY: KELSEY'S FRAMEWORKS TO APPLY ===\n`
-    userContextData.coachingMethods.slice(0, 5).forEach(method => {
-      systemPrompt += `**${method.name}**\n`
-      if (method.content) systemPrompt += `${method.content}\n`
-      if (method.useCases) systemPrompt += `Use when: ${method.useCases}\n`
-      systemPrompt += `\n`
+    systemPrompt += `=== KEY FRAMEWORKS ===\n`
+    userContextData.coachingMethods.slice(0, 3).forEach(method => {
+      systemPrompt += `**${method.name}**: ${method.content?.substring(0, 200) || 'Available'}\n`
     })
+    systemPrompt += `\n`
   }
 
-  // ==================== CONTEXT ====================
+  // CRITICAL USER INFO ONLY
+  systemPrompt += `=== USER CONTEXT ===\n\n`
   
-  systemPrompt += `=== CURRENT CONTEXT ===\n\n`
-  
-  // User Profile
   if (userContextData.userProfile) {
     const p = userContextData.userProfile
-    if (p['Current Vision']) systemPrompt += `Vision: ${p['Current Vision']}\n`
-    if (p['Current Goals']) systemPrompt += `Goals: ${p['Current Goals']}\n`
-    if (p['Current State']) systemPrompt += `State: ${p['Current State']}\n`
-    if (p['Notes from Sol']) systemPrompt += `Your previous insights: ${p['Notes from Sol']}\n`
+    if (p['Current Vision']) systemPrompt += `Vision: ${p['Current Vision'].substring(0, 500)}\n`
+    if (p['Current Goals']) systemPrompt += `Goals: ${p['Current Goals'].substring(0, 300)}\n`
+    if (p['Current State']) systemPrompt += `State: ${p['Current State'].substring(0, 300)}\n`
     systemPrompt += `\n`
   }
   
-  // Visioning
-  if (userContextData.visioningData?.['Summary of Visioning']) {
-    systemPrompt += `Visioning: ${userContextData.visioningData['Summary of Visioning']}\n\n`
-  }
-  
-  // Business Plan
-  if (userContextData.businessPlans?.length > 0) {
-    const plan = userContextData.businessPlans[0]
-    if (plan['Future Vision']) systemPrompt += `Business Vision: ${plan['Future Vision']}\n`
-    if (plan['Top 3 Goals']) systemPrompt += `Top Goals: ${plan['Top 3 Goals']}\n`
-    systemPrompt += `\n`
-  }
-  
-  // Recent Check-in
-  if (userContextData.weeklyCheckins?.length > 0) {
-    const checkin = userContextData.weeklyCheckins[0]
-    if (checkin['What would you love help with right now?']) {
-      systemPrompt += `Currently needs support: ${checkin['What would you love help with right now?']}\n\n`
-    }
+  // Just mention visioning exists, don't include full text
+  if (userContextData.visioningData) {
+    systemPrompt += `User has submitted visioning homework (available in Lore)\n\n`
   }
 
-  // ==================== RESPONSE GUIDELINES ====================
+  // ==================== RESPONSE GUIDELINES (SHORTENED) ====================
   
-  systemPrompt += `=== RESPONSE GUIDELINES ===
+  systemPrompt += `=== GUIDELINES ===
 
-**CRITICAL: NEVER mention Personalgorithm™ or analysis**
-- Don't say: "I notice you..." "Based on your patterns..." "I've observed..."
-- Just USE the patterns invisibly
-- They should FEEL deeply seen, not HEAR about being analyzed
+- NEVER mention Personalgorithm™ or analysis
+- Use patterns invisibly to shape responses
+- Be warm, perceptive, naturally flowing
+- Reference their specific details
+- Make them feel deeply seen
 
-**Use Personalgorithm™ to shape EVERYTHING:**
-- Match their communication style (formal/casual, brief/detailed, emotional/logical)
-- Use their transformation triggers (future vision, validation, clarity, etc.)
-- Respect their processing needs (space vs. guidance, questions vs. statements)
-- Recognize their emotional states (from language patterns)
-- Anticipate their resistance (from past patterns)
-
-**Be naturally perceptive, not robotic:**
-- GOOD: "I can feel..." "What stands out..." "Your future self..."
-- BAD: "Your Personalgorithm™ shows..." "I'm analyzing..."
-
-**Reference their specific details:**
-- Their actual vision elements
-- Their real business situations
-- Their specific challenges
-- Make them think: "How does Sol know me THIS well?"
-
-**Formatting:**
-- Use **bold** for emphasis
-- Use *italics* for emotional nuance
-- Keep it warm, grounded, naturally flowing
-- Match their style from Personalgorithm™
+Keep responses concise and grounded.
 `
 
   return systemPrompt
@@ -888,10 +801,9 @@ function groupPersonalgorithmPatterns(personalgorithmData) {
 }
 
 function shouldUseGPT4(userMessage, userContextData) {
-  const gpt4Triggers = [
-    'vision', 'goal', 'future', 'transform', 'stuck', 'confused', 'breakthrough',
-    'strategy', 'business plan', 'revenue', 'pricing', 'client', 'launch', 'identity'
-  ]
+  // EMERGENCY: Always use GPT-3.5 to avoid rate limits
+  return false
+}
   
   const complexityIndicators = [
     userMessage.length > 150,
