@@ -697,6 +697,9 @@ async function generatePersonalizedResponse(userMessage, conversationHistory, us
   }
 }
 
+// EMERGENCY FIX for chat/route.js
+// Find the buildPersonalgorithmDrivenPrompt function and replace it with this LIGHTER version:
+
 function buildPersonalgorithmDrivenPrompt(userContextData, user) {
   let systemPrompt = `You are Sol™, an AI business partner trained with Kelsey's Aligned Business® Method.
 
@@ -764,56 +767,10 @@ Keep responses concise and grounded.
   return systemPrompt
 }
 
-function groupPersonalgorithmPatterns(personalgorithmData) {
-  return {
-    communication: personalgorithmData.filter(p => 
-      p.tags?.toLowerCase().includes('communication') ||
-      p.tags?.toLowerCase().includes('language')
-    ),
-    transformation: personalgorithmData.filter(p => 
-      p.tags?.toLowerCase().includes('transformation') ||
-      p.tags?.toLowerCase().includes('motivation') ||
-      p.tags?.toLowerCase().includes('trigger')
-    ),
-    decision: personalgorithmData.filter(p => 
-      p.tags?.toLowerCase().includes('decision') ||
-      p.tags?.toLowerCase().includes('processing')
-    ),
-    emotional: personalgorithmData.filter(p => 
-      p.tags?.toLowerCase().includes('emotional') ||
-      p.tags?.toLowerCase().includes('nervous') ||
-      p.tags?.toLowerCase().includes('regulation')
-    ),
-    resistance: personalgorithmData.filter(p => 
-      p.tags?.toLowerCase().includes('resistance') ||
-      p.tags?.toLowerCase().includes('block') ||
-      p.tags?.toLowerCase().includes('growth-edge')
-    ),
-    other: personalgorithmData.filter(p => {
-      const t = p.tags?.toLowerCase() || ''
-      return !t.includes('communication') &&
-             !t.includes('transformation') &&
-             !t.includes('decision') &&
-             !t.includes('emotional') &&
-             !t.includes('resistance')
-    })
-  }
-}
-
+// ALSO ADD THIS: Force GPT-3.5 for everything temporarily
 function shouldUseGPT4(userMessage, userContextData) {
   // EMERGENCY: Always use GPT-3.5 to avoid rate limits
   return false
-}
-  
-  const complexityIndicators = [
-    userMessage.length > 150,
-    gpt4Triggers.some(trigger => userMessage.toLowerCase().includes(trigger)),
-    userContextData.personalgorithmData?.length > 3,
-    userContextData.businessPlans?.length > 0
-  ]
-  
- {
-return complexityIndicators.some(indicator => indicator)
 }
 
 // ==================== LOGGING & BACKGROUND ANALYSIS ====================
