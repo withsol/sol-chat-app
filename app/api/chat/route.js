@@ -95,12 +95,8 @@ export async function POST(request) {
     }
 
     // 4. Generate tags for the conversation
+    // TEMPORARILY DISABLED to avoid rate limits
     let conversationTags = 'general-support'
-    try {
-      conversationTags = await generateConversationTags(message, aiResponse.content)
-    } catch (tagError) {
-      console.error('❌ Tag generation failed:', tagError)
-    }
     
     // 5. Log to Airtable
     try {
@@ -818,7 +814,8 @@ async function logToAirtable(messageData) {
   }
 }
 
-function queuePersonalgorithmAnalysis(email, userMessage, solResponse, conversationHistory) {
+function // TEMPORARILY DISABLED to avoid rate limits
+// queuePersonalgorithmAnalysis(user.email, message, aiResponse.content, conversationHistory) {
   // This happens SILENTLY in background - user never knows
   setTimeout(async () => {
     try {
