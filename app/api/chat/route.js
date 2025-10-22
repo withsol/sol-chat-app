@@ -16,7 +16,7 @@ export async function POST(request) {
 
     // 1. Fetch CORE context (always needed, lightweight)
     let userContextData = await fetchCoreUserContext(user.email)
-    console.log('✅ Core context loaded')
+    console.log('âœ… Core context loaded')
     
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     const timestamp = new Date().toISOString()
@@ -24,7 +24,7 @@ export async function POST(request) {
     // 2. Check for visioning/business plan content (detection only, no inline processing)
     const visioningGuidance = await detectAndQueueHeavyProcessing(message, userContextData, user)
     if (visioningGuidance && visioningGuidance.hasVisioningGuidance) {
-      console.log('✅ Heavy content detected - background processing triggered')
+      console.log('âœ… Heavy content detected - background processing triggered')
       
       // Log the interaction
       try {
@@ -38,14 +38,14 @@ export async function POST(request) {
           tags: 'visioning-detected'
         })
       } catch (logError) {
-        console.error('❌ Logging failed:', logError)
+        console.error('âŒ Logging failed:', logError)
       }
 
       // Update last message date
       try {
         await updateUserProfile(user.email, { 'Last Message Date': timestamp })
       } catch (profileError) {
-        console.error('❌ Profile update failed:', profileError)
+        console.error('âŒ Profile update failed:', profileError)
       }
 
       return NextResponse.json({
@@ -57,7 +57,7 @@ export async function POST(request) {
 
     // 3. Load CONTEXTUAL memory (smart - only what's relevant to THIS message)
     const contextualMemory = await getContextualMemory(message, user.email, userContextData)
-    console.log('✅ Contextual memory loaded:', Object.keys(contextualMemory))
+    console.log('âœ… Contextual memory loaded:', Object.keys(contextualMemory))
 
     // 4. Generate AI response using smart context system
     let aiResponse
@@ -70,9 +70,9 @@ export async function POST(request) {
         contextualMemory,
         user
       )
-      console.log('✅ AI response successful')
+      console.log('âœ… AI response successful')
     } catch (aiError) {
-      console.error('❌ AI response failed:', aiError)
+      console.error('âŒ AI response failed:', aiError)
       aiResponse = {
         content: `I'm having a moment of connection difficulty, but I'm still here with you. Your message was important - would you mind sharing that again?`,
         tokensUsed: 0,
@@ -85,7 +85,7 @@ export async function POST(request) {
     try {
       conversationTags = await generateConversationTags(message, aiResponse.content)
     } catch (tagError) {
-      console.error('❌ Tag generation failed:', tagError)
+      console.error('âŒ Tag generation failed:', tagError)
     }
     
     // 6. Log to Airtable
@@ -100,12 +100,12 @@ export async function POST(request) {
         tokensUsed: aiResponse.tokensUsed || 0,
         tags: conversationTags
       })
-      console.log('✅ Airtable logging successful')
+      console.log('âœ… Airtable logging successful')
     } catch (airtableError) {
-      console.error('❌ Airtable logging failed:', airtableError)
+      console.error('âŒ Airtable logging failed:', airtableError)
     }
 
-    // 7. Queue background Personalgorithm™ analysis (silent, non-blocking)
+    // 7. Queue background Personalgorithmâ„¢ analysis (silent, non-blocking)
     if (aiResponse.content && !aiResponse.content.includes('connection difficulty')) {
       queuePersonalgorithmAnalysis(user.email, message, aiResponse.content, conversationHistory)
     }
@@ -114,7 +114,7 @@ export async function POST(request) {
     try {
       await updateUserProfile(user.email, { 'Last Message Date': timestamp })
     } catch (updateError) {
-      console.error('❌ Profile update failed:', updateError)
+      console.error('âŒ Profile update failed:', updateError)
     }
 
     return NextResponse.json({
@@ -125,7 +125,7 @@ export async function POST(request) {
     })
 
   } catch (error) {
-    console.error('❌ CRITICAL CHAT API ERROR:', error)
+    console.error('âŒ CRITICAL CHAT API ERROR:', error)
     console.error('Error stack:', error.stack)
     
     return NextResponse.json({
@@ -155,7 +155,7 @@ async function fetchCoreUserContext(email) {
     }
 
   } catch (error) {
-    console.error('❌ Error fetching core context:', error)
+    console.error('âŒ Error fetching core context:', error)
     return {
       userProfile: null,
       personalgorithmEssence: [],
@@ -212,7 +212,7 @@ async function getContextualMemory(userMessage, email, coreContext) {
     return contextualData
     
   } catch (error) {
-    console.error('❌ Error loading contextual memory:', error)
+    console.error('âŒ Error loading contextual memory:', error)
     return {}
   }
 }
@@ -282,7 +282,7 @@ async function generateSmartResponse(userMessage, conversationHistory, coreConte
 }
 
 function buildSmartContextPrompt(coreContext, contextualMemory, user, userMessage) {
-  let systemPrompt = `You are Sol™, an AI business partner trained on Kelsey's Aligned Business® Method.
+  let systemPrompt = `You are Solâ„¢, an AI business partner trained on Kelsey's Aligned BusinessÂ® Method.
 
 USER: ${user.email}
 
@@ -299,7 +299,7 @@ USER: ${user.email}
     systemPrompt += '\n'
   }
 
-  // 2. TOP PERSONALGORITHM™ INSIGHTS (Always include - top 5)
+  // 2. TOP PERSONALGORITHMâ„¢ INSIGHTS (Always include - top 5)
   if (coreContext.personalgorithmEssence?.length > 0) {
     systemPrompt += `=== HOW THIS PERSON OPERATES BEST ===\n`
     coreContext.personalgorithmEssence.forEach((p, i) => {
@@ -346,7 +346,7 @@ USER: ${user.email}
   systemPrompt += `=== RESPONSE APPROACH ===
 - Be warm, perceptive, and naturally conversational
 - Reference their SPECIFIC patterns and past moments
-- Never mention "Personalgorithm™" or "analysis" explicitly
+- Never mention "Personalgorithmâ„¢" or "analysis" explicitly
 - Ask powerful questions that create insight
 - Keep responses concise (2-4 paragraphs unless more depth needed)
 - Make them feel deeply seen and understood
@@ -391,7 +391,7 @@ async function detectAndQueueHeavyProcessing(userMessage, userContextData, user)
     )
     
     if (hasVisioningContent) {
-      console.log('🎯 Visioning content detected - triggering background processing')
+      console.log('ðŸŽ¯ Visioning content detected - triggering background processing')
       
       // TRIGGER background processing (don't wait for it)
       triggerBackgroundVisioningProcessing(user.email, userMessage)
@@ -447,7 +447,7 @@ function triggerBackgroundVisioningProcessing(email, visioningText) {
 }
 
 function generateWarmAcknowledgment(userContextData) {
-  // Use their Personalgorithm™ if it exists to shape the tone
+  // Use their Personalgorithmâ„¢ if it exists to shape the tone
   let response = `Thank you for sharing your vision with me. `
   
   // Check if they have emotional processing patterns
@@ -475,7 +475,7 @@ function generateWarmAcknowledgment(userContextData) {
   return response
 }
 
-// ==================== PERSONALGORITHM™ ANALYSIS (Background) ====================
+// ==================== PERSONALGORITHMâ„¢ ANALYSIS (Background) ====================
 
 function queuePersonalgorithmAnalysis(email, userMessage, solResponse, conversationHistory) {
   // Run SILENTLY in background - user never sees this
@@ -495,10 +495,10 @@ function queuePersonalgorithmAnalysis(email, userMessage, solResponse, conversat
       
       if (response.ok) {
         const result = await response.json()
-        console.log('🧠 Personalgorithm™ analysis completed:', result.entriesCreated || 0, 'insights')
+        console.log('ðŸ§  Personalgorithmâ„¢ analysis completed:', result.entriesCreated || 0, 'insights')
       }
     } catch (error) {
-      console.error('Background Personalgorithm™ analysis failed:', error)
+      console.error('Background Personalgorithmâ„¢ analysis failed:', error)
       // Fail silently - user never knows
     }
   }, 2000) // 2 second delay
@@ -530,7 +530,7 @@ async function fetchUserProfile(email) {
 async function fetchTopPersonalgorithm(email, limit = 5) {
   try {
     const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=${limit}`
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithmâ„¢?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=${limit}`
     
     const response = await fetch(url, {
       headers: {
@@ -544,7 +544,7 @@ async function fetchTopPersonalgorithm(email, limit = 5) {
     
     return data.records.map(record => ({
       id: record.id,
-      notes: record.fields['Personalgorithm™ Notes'],
+      notes: record.fields['Personalgorithmâ„¢ Notes'],
       dateCreated: record.fields['Date created'],
       tags: record.fields['Tags'] || ''
     })).filter(item => item.notes)
@@ -582,7 +582,7 @@ async function fetchRecentMessages(email, limit = 2) {
 
 async function fetchRelevantCoachingMethods(messageLower) {
   try {
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned Business® Method?maxRecords=10`
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned BusinessÂ® Method?maxRecords=10`
     
     const response = await fetch(url, {
       headers: {
@@ -614,7 +614,7 @@ async function fetchRelevantCoachingMethods(messageLower) {
 
 async function fetchRelevantSolBrain(messageLower) {
   try {
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Sol™?maxRecords=20`
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Solâ„¢?maxRecords=20`
     
     const response = await fetch(url, {
       headers: {
@@ -641,7 +641,7 @@ async function fetchRelevantSolBrain(messageLower) {
 async function fetchLatestBusinessPlan(email) {
   try {
     const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned Business® Plans?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date Submitted&sort[0][direction]=desc&maxRecords=1`
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned BusinessÂ® Plans?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date Submitted&sort[0][direction]=desc&maxRecords=1`
     
     const response = await fetch(url, {
       headers: {
@@ -730,7 +730,7 @@ async function logToAirtable(messageData) {
     }
 
     const result = await response.json()
-    console.log('✅ Message logged:', result.id)
+    console.log('âœ… Message logged:', result.id)
     return result
   } catch (error) {
     console.error('Error logging to Airtable:', error)

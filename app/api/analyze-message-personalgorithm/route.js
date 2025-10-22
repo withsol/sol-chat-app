@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
-  console.log('=== ANALYZING MESSAGE FOR PERSONALGORITHM™ ===')
+  console.log('=== ANALYZING MESSAGE FOR PERSONALGORITHMâ„¢ ===')
   
   try {
     const { email, userMessage, solResponse, conversationContext = [] } = await request.json()
@@ -20,14 +20,14 @@ export async function POST(request) {
       return NextResponse.json({
         success: true,
         analyzed: false,
-        reason: 'Conversation too brief for meaningful Personalgorithm™ analysis',
+        reason: 'Conversation too brief for meaningful Personalgorithmâ„¢ analysis',
         entriesCreated: 0
       })
     }
 
-    console.log('Analyzing conversation for Personalgorithm™ insights...')
+    console.log('Analyzing conversation for Personalgorithmâ„¢ insights...')
 
-    // Generate DEEP Personalgorithm™ insights
+    // Generate DEEP Personalgorithmâ„¢ insights
     const insights = await generateDeepPersonalgorithmInsights(userMessage, solResponse, conversationContext)
     
     if (insights && insights.length > 0) {
@@ -36,7 +36,7 @@ export async function POST(request) {
       for (const insight of insights) {
         const entry = await createPersonalgorithmEntry(email, insight.note, insight.tags)
         if (entry) {
-          console.log(`✅ Created Personalgorithm™ entry for ${email}`)
+          console.log(`âœ… Created Personalgorithmâ„¢ entry for ${email}`)
           createdEntries.push({
             insight: insight.note.substring(0, 100) + '...',
             entryId: entry.id,
@@ -50,7 +50,7 @@ export async function POST(request) {
         analyzed: true,
         entriesCreated: createdEntries.length,
         createdEntries: createdEntries,
-        message: `Added ${createdEntries.length} new Personalgorithm™ insights from this conversation`
+        message: `Added ${createdEntries.length} new Personalgorithmâ„¢ insights from this conversation`
       })
     }
 
@@ -62,9 +62,9 @@ export async function POST(request) {
     })
 
   } catch (error) {
-    console.error('❌ Message Personalgorithm™ analysis error:', error)
+    console.error('âŒ Message Personalgorithmâ„¢ analysis error:', error)
     return NextResponse.json({
-      error: 'Failed to analyze message for Personalgorithm™',
+      error: 'Failed to analyze message for Personalgorithmâ„¢',
       details: error.message
     }, { status: 500 })
   }
@@ -94,7 +94,7 @@ function shouldAnalyzeForPersonalgorithm(userMessage, solResponse) {
 
 async function generateDeepPersonalgorithmInsights(userMessage, solResponse, conversationContext) {
   try {
-    const analysisPrompt = `You are analyzing a coaching conversation to identify SPECIFIC Personalgorithm™ patterns - the unique ways this individual operates, communicates, and transforms.
+    const analysisPrompt = `You are analyzing a coaching conversation to identify SPECIFIC Personalgorithmâ„¢ patterns - the unique ways this individual operates, communicates, and transforms.
 
 USER MESSAGE: "${userMessage}"
 SOL RESPONSE: "${solResponse}"
@@ -158,7 +158,7 @@ Be SPECIFIC to this individual. Avoid generic observations. Focus on the nuances
     })
 
     if (!response.ok) {
-      console.error('Personalgorithm™ analysis failed:', response.status)
+      console.error('Personalgorithmâ„¢ analysis failed:', response.status)
       return null
     }
 
@@ -172,11 +172,11 @@ Be SPECIFIC to this individual. Avoid generic observations. Focus on the nuances
     // Parse the structured response
     const insights = parsePersonalgorithmInsights(analysisText)
     
-    console.log(`Generated ${insights.length} Personalgorithm™ insights`)
+    console.log(`Generated ${insights.length} Personalgorithmâ„¢ insights`)
     return insights
 
   } catch (error) {
-    console.error('Error generating Personalgorithm™ insights:', error)
+    console.error('Error generating Personalgorithmâ„¢ insights:', error)
     return null
   }
 }
@@ -207,13 +207,13 @@ async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated')
     // CRITICAL: Get the User record ID for proper linking
     const userRecordId = await getUserRecordId(email)
     if (!userRecordId) {
-      console.error('❌ Cannot create Personalgorithm™ entry - user record not found for:', email)
+      console.error('âŒ Cannot create Personalgorithmâ„¢ entry - user record not found for:', email)
       return null
     }
 
     const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
-    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™`, {
+    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithmâ„¢`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
@@ -221,9 +221,9 @@ async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated')
       },
       body: JSON.stringify({
         fields: {
-          'Personalgorithm™ ID': personalgorithmId,
-          'User': [userRecordId], // ✅ CORRECT: Link to User record, not email string
-          'Personalgorithm™ Notes': notes,
+          'Personalgorithmâ„¢ ID': personalgorithmId,
+          'User': [userRecordId], // âœ… CORRECT: Link to User record, not email string
+          'Personalgorithmâ„¢ Notes': notes,
           'Date created': new Date().toISOString(),
           'Tags': typeof tags === 'string' ? tags : tags.join(', ')
         }
@@ -232,16 +232,16 @@ async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated')
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Failed to create Personalgorithm™ entry:', response.status, errorText)
+      console.error('Failed to create Personalgorithmâ„¢ entry:', response.status, errorText)
       return null
     }
 
     const result = await response.json()
-    console.log('✅ Personalgorithm™ entry created:', result.id)
+    console.log('âœ… Personalgorithmâ„¢ entry created:', result.id)
     return result
     
   } catch (error) {
-    console.error('Error creating Personalgorithm™ entry:', error)
+    console.error('Error creating Personalgorithmâ„¢ entry:', error)
     return null
   }
 }

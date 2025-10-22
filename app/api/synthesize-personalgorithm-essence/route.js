@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
-  console.log('=== SYNTHESIZING PERSONALGORITHM™ ESSENCE ===')
+  console.log('=== SYNTHESIZING PERSONALGORITHMâ„¢ ESSENCE ===')
   
   try {
     const { email, forceRegenerate = false } = await request.json()
@@ -45,18 +45,18 @@ export async function POST(request) {
       }
     }
 
-    // Fetch ALL Personalgorithm™ entries
+    // Fetch ALL Personalgorithmâ„¢ entries
     const allPersonalgorithm = await fetchAllPersonalgorithm(email)
     
     if (allPersonalgorithm.length === 0) {
       return NextResponse.json({
         success: false,
-        message: 'No Personalgorithm™ data to synthesize',
+        message: 'No Personalgorithmâ„¢ data to synthesize',
         count: 0
       })
     }
 
-    console.log(`Synthesizing from ${allPersonalgorithm.length} Personalgorithm™ entries...`)
+    console.log(`Synthesizing from ${allPersonalgorithm.length} Personalgorithmâ„¢ entries...`)
 
     // Generate the ESSENCE PROFILE
     const essenceProfile = await generateEssenceProfile(allPersonalgorithm, userProfile)
@@ -74,20 +74,20 @@ export async function POST(request) {
       'Last Synthesis Date': new Date().toISOString()
     })
 
-    console.log('✅ Personalgorithm™ Essence synthesized and saved')
+    console.log('âœ… Personalgorithmâ„¢ Essence synthesized and saved')
 
     return NextResponse.json({
       success: true,
-      message: 'Personalgorithm™ Essence profile generated successfully',
+      message: 'Personalgorithmâ„¢ Essence profile generated successfully',
       entriesAnalyzed: allPersonalgorithm.length,
       essenceLength: essenceProfile.length,
       preview: essenceProfile.substring(0, 200) + '...'
     })
 
   } catch (error) {
-    console.error('❌ Essence synthesis error:', error)
+    console.error('âŒ Essence synthesis error:', error)
     return NextResponse.json({
-      error: 'Failed to synthesize Personalgorithm™ essence',
+      error: 'Failed to synthesize Personalgorithmâ„¢ essence',
       details: error.message
     }, { status: 500 })
   }
@@ -144,7 +144,7 @@ USER: ${userProfile['User ID']}
 CURRENT VISION: ${userProfile['Current Vision'] || 'Not yet defined'}
 CURRENT STATE: ${userProfile['Current State'] || 'Not yet defined'}
 
-PERSONALGORITHM™ DATA (${personalgorithmEntries.length} observations):
+PERSONALGORITHMâ„¢ DATA (${personalgorithmEntries.length} observations):
 
 COMMUNICATION PATTERNS (${entriesByCategory.communication.length} observations):
 ${entriesByCategory.communication.slice(0, 5).join('\n') || 'None yet'}
@@ -221,7 +221,7 @@ Write as a synthesis, not a list. Connect the dots. Show the deeper patterns.`
     const result = await response.json()
     const essenceProfile = result.choices[0].message.content.trim()
     
-    console.log('✅ Essence profile generated:', essenceProfile.length, 'characters')
+    console.log('âœ… Essence profile generated:', essenceProfile.length, 'characters')
     return essenceProfile
 
   } catch (error) {
@@ -256,7 +256,7 @@ async function getUserProfile(email) {
 async function fetchAllPersonalgorithm(email) {
   try {
     const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=100`
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithmâ„¢?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=100`
     
     const response = await fetch(url, {
       headers: {
@@ -269,7 +269,7 @@ async function fetchAllPersonalgorithm(email) {
     const data = await response.json()
     
     return data.records.map(record => ({
-      notes: record.fields['Personalgorithm™ Notes'],
+      notes: record.fields['Personalgorithmâ„¢ Notes'],
       dateCreated: record.fields['Date created'],
       tags: record.fields['Tags'] || ''
     })).filter(item => item.notes)
