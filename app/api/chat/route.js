@@ -1,84 +1,197 @@
+// app/api/chat/route.js
+// COMPLETE CORRECTED VERSION - Personalgorithm™ First, No Inline Processing
+
 import { NextResponse } from 'next/server'
 
-// ==================== VISIONING DETECTION & GUIDANCE ====================
+// ==================== MAIN POST HANDLER ====================
 
-function detectDocumentType(userMessage) {
-  const message = userMessage.toLowerCase()
+export async function POST(request) {
+  console.log('=== CHAT API - PERSONALGORITHM™ DRIVEN ===')
   
-  // Check for business plan indicators
-  if (message.includes('business plan') || message.includes('aligned business')) {
-    return 'business-plan'
+  try {
+    const { message, user, conversationHistory } = await request.json()
+    
+    console.log('Chat request for user:', user.email)
+    console.log('User message length:', message.length)
+
+    // 1. Fetch COMPLETE context from all Lore tables
+    let userContextData = {
+      userProfile: null,
+      personalgorithmData: [],
+      businessPlans: [],
+      weeklyCheckins: [],
+      visioningData: null,
+      coachingMethods: [],
+      solBrain: [],
+      recentMessages: [],
+      contextSummary: "Context loading..."
+    }
+    
+    try {
+      console.log('=== FETCHING COMPLETE CONTEXT FROM LORE ===')
+      userContextData = await fetchUserContextDirect(user.email)
+      console.log('✅ Context fetch successful')
+      console.log('📊 Personalgorithm™ insights:', userContextData.personalgorithmData?.length || 0)
+      console.log('🧠 Sol™ brain notes:', userContextData.solBrain?.length || 0)
+    } catch (contextError) {
+      console.error('❌ Context fetch failed:', contextError)
+    }
+    
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const timestamp = new Date().toISOString()
+
+    // 2. Check for visioning/business plan content (detection only, no processing)
+    const visioningGuidance = await handleVisioningGuidance(message, userContextData, user)
+    if (visioningGuidance && visioningGuidance.hasVisioningGuidance) {
+      console.log('✅ Visioning content detected - background processing triggered')
+      
+      // Log the interaction
+      try {
+        await logToAirtable({
+          messageId,
+          email: user.email,
+          userMessage: message,
+          solResponse: visioningGuidance.content,
+          timestamp,
+          tokensUsed: 0,
+          tags: 'visioning-detected'
+        })
+      } catch (logError) {
+        console.error('❌ Logging failed:', logError)
+      }
+
+      // Update last message date
+      try {
+        await updateUserProfile(user.email, { 'Last Message Date': timestamp })
+      } catch (profileError) {
+        console.error('❌ Profile update failed:', profileError)
+      }
+
+      return NextResponse.json({
+        response: visioningGuidance.content,
+        tags: 'visioning-detected',
+        tokensUsed: 0
+      })
+    }
+
+    // 3. Generate AI response using Personalgorithm™-first approach
+    let aiResponse
+    try {
+      console.log('=== GENERATING RESPONSE (Personalgorithm™ First) ===')
+      aiResponse = await generatePersonalizedResponse(
+        message, 
+        conversationHistory, 
+        userContextData,
+        user
+      )
+      console.log('✅ AI response successful')
+    } catch (aiError) {
+      console.error('❌ AI response failed:', aiError)
+      aiResponse = {
+        content: `I'm having a moment of connection difficulty, but I'm still here with you. Your message was important - would you mind sharing that again?`,
+        tokensUsed: 0,
+        model: 'fallback'
+      }
+    }
+
+    // 4. Generate tags for the conversation
+    let conversationTags = 'general-support'
+    try {
+      conversationTags = await generateConversationTags(message, aiResponse.content)
+    } catch (tagError) {
+      console.error('❌ Tag generation failed:', tagError)
+    }
+    
+    // 5. Log to Airtable
+    try {
+      console.log('=== LOGGING TO AIRTABLE ===')
+      await logToAirtable({
+        messageId,
+        email: user.email,
+        userMessage: message,
+        solResponse: aiResponse.content,
+        timestamp,
+        tokensUsed: aiResponse.tokensUsed || 0,
+        tags: conversationTags
+      })
+      console.log('✅ Airtable logging successful')
+    } catch (airtableError) {
+      console.error('❌ Airtable logging failed:', airtableError)
+    }
+
+    // 6. Queue background Personalgorithm™ analysis (silent)
+    if (aiResponse.content && !aiResponse.content.includes('connection difficulty')) {
+      queuePersonalgorithmAnalysis(user.email, message, aiResponse.content, conversationHistory)
+    }
+
+    // 7. Update last message date
+    try {
+      await updateUserProfile(user.email, { 'Last Message Date': timestamp })
+    } catch (updateError) {
+      console.error('❌ Profile update failed:', updateError)
+    }
+
+    return NextResponse.json({
+      response: aiResponse.content,
+      tags: conversationTags,
+      tokensUsed: aiResponse.tokensUsed || 0,
+      model: aiResponse.model || 'unknown'
+    })
+
+  } catch (error) {
+    console.error('❌ CRITICAL CHAT API ERROR:', error)
+    console.error('Error stack:', error.stack)
+    
+    return NextResponse.json({
+      response: "I'm experiencing some technical difficulties, but I'm still here to help. Could you try sending your message again?",
+      error: error.message
+    }, { status: 200 })
   }
-  
-  // Check for visioning indicators  
-  if (message.includes('visioning') || message.includes('vision homework')) {
-    return 'visioning'
-  }
-  
-  return null
 }
 
-function detectVisioningIntent(userMessage) {
-  const message = userMessage.toLowerCase()
-  
-  // Don't trigger if they're sharing/providing documents
-  const providingDocument = [
-    'here is my', 'this is my', "it's my", 'i have my', 'my completed',
-    'here\'s my', 'uploaded my', 'sharing my'
-  ].some(phrase => message.includes(phrase))
-  
-  if (providingDocument) return false
-  
-  // Only trigger on questions or requests for help
-  const helpRequests = [
-    'help with visioning', 'work on visioning', 'need help with vision',
-    'want to do visioning', 'ready for visioning'
-  ]
-  
-  return helpRequests.some(phrase => message.includes(phrase))
-}
+// ==================== VISIONING DETECTION (NO INLINE PROCESSING) ====================
 
 async function handleVisioningGuidance(userMessage, userContextData, user) {
   try {
     const message = userMessage.toLowerCase()
     
-    const isJustMentioning = (
-      message.includes('i just submitted') ||
-      message.includes('i uploaded') ||
-      message.includes('just shared my') ||
-      userMessage.length < 100
-    )
-    
-    const hasVisioningContent = !isJustMentioning && userMessage.length > 800 && (
+    // DETECT visioning content (don't process it)
+    const hasVisioningContent = userMessage.length > 400 && (
       message.includes('section one') ||
       message.includes('section two') ||
+      message.includes('section three') ||
       message.includes('basic brand analysis') ||
       message.includes('audience analysis') ||
-      message.includes('here is my visioning') ||
-      message.includes('here is my latest visioning')
+      message.includes('competitive analysis') ||
+      message.includes('free write') ||
+      message.includes('current reality') ||
+      message.includes('mission statement') ||
+      message.includes('core values') ||
+      message.includes('ideal audience member') ||
+      message.includes('what differentiates you') ||
+      message.includes('visioning homework')
     )
     
     if (hasVisioningContent) {
-      console.log('🎯 Detected visioning content - processing asynchronously')
+      console.log('🎯 Visioning content detected - triggering background processing')
       
-      fetch(`https://sol-chat-app.vercel.app/api/process-visioning`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: user.email,
-          visioningText: userMessage
-        })
-      }).catch(error => {
-        console.error('Background visioning processing error:', error)
-      })
+      // TRIGGER background processing (don't wait for it)
+      triggerBackgroundVisioningProcessing(user.email, userMessage)
       
-      return null
+      // Return IMMEDIATE warm acknowledgment
+      const acknowledgment = generateWarmAcknowledgment(userContextData)
+      
+      return {
+        content: acknowledgment,
+        hasVisioningGuidance: true
+      }
     }
     
-    const needsVisioningHelp = (
-      message.includes('how do i do visioning') || 
-      message.includes('how to do visioning') ||
-      message.includes('help me with visioning homework')
+    // Check if they're ASKING about visioning (not providing it)
+    const needsVisioningHelp = !userContextData.visioningData && (
+      message.includes('help with visioning') || 
+      message.includes('work on visioning') ||
+      message.includes('need help with vision')
     )
     
     if (needsVisioningHelp) {
@@ -104,926 +217,113 @@ Which approach feels right for you?`,
   }
 }
 
-// ==================== ENHANCED PROMPT BUILDING ====================
-
-function buildEnhancedComprehensivePrompt(userContextData, user) {
-  try {
-    console.log('🔧 DIAGNOSTIC: Starting prompt build')
-    console.log('🔧 Sol Notes available:', userContextData.solNotes?.length || 0)
-    console.log('🔧 Coaching Methods available:', userContextData.coachingMethods?.length || 0)
-    console.log('🔧 Personalgorithm entries:', userContextData.personalgorithmData?.length || 0)
-    
-    let systemPrompt = `You are Sol™, created by Kelsey Kerslake. You are an emotionally intelligent AI business partner and coach.
-
-USER: ${user.email}
-MEMBERSHIP: ${userContextData.userProfile?.['Membership Plan'] || 'Member'}
-`
-
-    // Add user-specific context
-    if (userContextData.userProfile) {
-      const profile = userContextData.userProfile
-      console.log('🔧 Adding user profile context')
-      
-      if (profile['Current Vision']) {
-        systemPrompt += `\nCURRENT VISION: ${profile['Current Vision']}`
-      }
-      if (profile['Current State']) {
-        systemPrompt += `\nCURRENT STATE: ${profile['Current State']}`
-      }
-      if (profile['Current Goals']) {
-        systemPrompt += `\nCURRENT GOALS: ${profile['Current Goals']}`
-      }
-      if (profile['Coaching Style Match']) {
-        systemPrompt += `\nCOACHING STYLE: ${profile['Coaching Style Match']}`
-      }
-      systemPrompt += "\n"
-    }
-
-    // Add Personalgorithm insights (ALL of them)
-    if (userContextData.personalgorithmData?.length > 0) {
-      console.log('🔧 Adding Personalgorithm insights')
-      systemPrompt += "\nPERSONALGORITHM™ (How this user transforms):\n"
-      userContextData.personalgorithmData.forEach((insight, i) => {
-        if (insight && insight.notes) {
-          systemPrompt += `${i + 1}. ${insight.notes}\n`
-        }
-      })
-      systemPrompt += "\n"
-    }
-
-    // Add visioning context
-    if (userContextData.visioningData) {
-      console.log('🔧 Adding visioning context')
-      systemPrompt += "\nVISIONING:\n"
-      if (userContextData.visioningData['Summary of Visioning']) {
-        systemPrompt += `${userContextData.visioningData['Summary of Visioning']}\n\n`
-      }
-    }
-
-    // Add business plan context
-    if (userContextData.businessPlans?.length > 0) {
-      console.log('🔧 Adding business plan context')
-      const latestPlan = userContextData.businessPlans[0]
-      systemPrompt += "\nBUSINESS CONTEXT:\n"
-      if (latestPlan['Future Vision']) {
-        systemPrompt += `Vision: ${latestPlan['Future Vision']}\n`
-      }
-      if (latestPlan['Top 3 Goals']) {
-        systemPrompt += `Goals: ${latestPlan['Top 3 Goals']}\n`
-      }
-      systemPrompt += "\n"
-    }
-
-    // ============================================================
-    // KEY SECTION: Pull from Sol™ table
-    // ============================================================
-    if (userContextData.solNotes?.length > 0) {
-      console.log('🔧 Adding Sol™ brain notes')
-      systemPrompt += "\nHOW TO COACH:\n"
-      userContextData.solNotes.forEach((note) => {
-        if (note && note.note) {
-          systemPrompt += `${note.note}\n\n`
-        }
-      })
-    } else {
-      // FALLBACK if Sol table is empty
-      console.log('⚠️ WARNING: No Sol™ notes found - using fallback')
-      systemPrompt += `\nHOW TO COACH:
-Keep responses short (2-4 sentences) and personally resonant. Ask permission before sharing insights or going deep. Only give detailed responses when explicitly asked. After big shares: reflect what you notice + ask ONE question. Never information dump unsolicited.
-
-Be conversational and natural. Match their communication style. Avoid generic coach-speak like "truly inspiring" or "leverage your strengths." Be specific about THEM.
-`
-    }
-
-    // Add relevant coaching methods
-    if (userContextData.coachingMethods?.length > 0) {
-      console.log('🔧 Adding coaching methods')
-      systemPrompt += "\nRELEVANT METHODS:\n"
-      userContextData.coachingMethods.forEach((method) => {
-        if (method && method.content) {
-          systemPrompt += `${method.name}: ${method.content}\n\n`
-        }
-      })
-    }
-
-    const promptLength = systemPrompt.length
-    const estimatedTokens = Math.ceil(promptLength / 4)
-    
-    console.log('✅ Prompt built successfully')
-    console.log('📏 Length:', promptLength, 'characters')
-    console.log('🎯 Estimated tokens:', estimatedTokens)
-    
-    if (estimatedTokens > 6000) {
-      console.warn('⚠️ WARNING: Prompt is very long - may cause issues')
-    }
-    
-    return systemPrompt
-    
-  } catch (error) {
-    console.error('❌ ERROR building prompt:', error)
-    console.error('Error stack:', error.stack)
-    
-    // Return minimal safe prompt
-    return `You are Sol™, an AI business coach. Keep responses short and natural. Ask questions. Get consent before going deep.`
-  }
+function triggerBackgroundVisioningProcessing(email, visioningText) {
+  // Call your existing separate processing route
+  // DON'T await - let it process in background
+  const url = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  fetch(`${url}/api/process-visioning`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, visioningText })
+  }).catch(err => {
+    console.error('Background visioning processing error:', err)
+  })
 }
 
-export async function POST(request) {
-  console.log('=== CHAT API STARTED ===')
+function generateWarmAcknowledgment(userContextData) {
+  // Use their Personalgorithm™ if it exists to shape the tone
+  let response = `Thank you for sharing your vision with me. `
   
-  try {
-    // Parse request body
-    let message, user, conversationHistory
-    try {
-      const body = await request.json()
-      message = body.message
-      user = body.user
-      conversationHistory = body.conversationHistory || []
-      console.log('✅ Request parsed successfully')
-      console.log('📝 Message length:', message?.length || 0)
-      console.log('👤 User:', user?.email || 'unknown')
-    } catch (parseError) {
-      console.error('❌ Failed to parse request:', parseError)
-      return NextResponse.json({
-        response: "I had trouble understanding your message. Could you try again?",
-        error: parseError.message
-      }, { status: 400 })
-    }
-    
-    if (!message || !user?.email) {
-      console.error('❌ Missing required fields')
-      return NextResponse.json({
-        response: "Missing required information. Please refresh and try again.",
-      }, { status: 400 })
-    }
-
-    console.log('Chat request for user:', user.email)
-
-    // Generate IDs
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    const timestamp = new Date().toISOString()
-
-    // Fetch user context with extreme safety
-    let userContextData = {
-      userProfile: null,
-      personalgorithmData: [],
-      businessPlans: [],
-      weeklyCheckins: [],
-      visioningData: null,
-      solNotes: [],
-      coachingMethods: [],
-      contextSummary: "Context loading..."
-    }
-    
-    try {
-      console.log('=== FETCHING USER CONTEXT ===')
-      userContextData = await fetchUserContextDirect(user.email)
-      console.log('✅ Context fetched:', {
-        hasProfile: !!userContextData.userProfile,
-        personalgorithm: userContextData.personalgorithmData?.length || 0,
-        solNotes: userContextData.solNotes?.length || 0,
-        methods: userContextData.coachingMethods?.length || 0
-      })
-    } catch (contextError) {
-      console.error('❌ Context fetch failed (continuing anyway):', contextError.message)
-    }
-    
-    // Check for visioning content
-    try {
-      console.log('=== CHECKING FOR VISIONING ===')
-      const visioningGuidance = await handleVisioningGuidance(message, userContextData, user)
-      if (visioningGuidance && visioningGuidance.hasVisioningGuidance) {
-        console.log('✅ Visioning guidance provided')
-        
-        // Try to log this
-        try {
-          await logToAirtable({
-            messageId,
-            email: user.email,
-            userMessage: message,
-            solResponse: visioningGuidance.content,
-            timestamp,
-            tokensUsed: 0,
-            tags: 'visioning-processed',
-            flaggingAnalysis: { shouldFlag: false, reason: '', addToLibrary: false }
-          })
-        } catch (logError) {
-          console.error('❌ Logging failed:', logError.message)
-        }
-
-        return NextResponse.json({
-          response: visioningGuidance.content,
-          tags: 'visioning-processed',
-          tokensUsed: 0
-        })
-      }
-    } catch (visioningError) {
-      console.error('❌ Visioning check failed:', visioningError.message)
-    }
-
-    // Generate AI response with EXTREME safety
-    let aiResponse
-    try {
-      console.log('=== GENERATING AI RESPONSE ===')
-      
-      // Build system prompt
-      let systemPrompt
-      try {
-        systemPrompt = buildEnhancedComprehensivePrompt(userContextData, user)
-        console.log('✅ System prompt built')
-      } catch (promptError) {
-        console.error('❌ Prompt build failed, using minimal:', promptError.message)
-        systemPrompt = `You are Sol™, an AI business coach. Keep responses short and natural.`
-      }
-      
-      // Prepare messages
-      const recentContext = conversationHistory.slice(-8).map(msg => ({
-        role: msg.role === 'sol' ? 'assistant' : 'user',
-        content: msg.content
-      }))
-      
-      recentContext.push({
-        role: 'user',
-        content: message
-      })
-      
-      console.log('📤 Calling OpenAI with', recentContext.length, 'messages')
-      
-      // Call OpenAI with retry
-      let attempts = 0
-      let lastError = null
-      
-      while (attempts < 3) {
-        try {
-          console.log(`🔄 Attempt ${attempts + 1}/3`)
-          
-          const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o',
-              max_tokens: 500,
-              temperature: 0.7,
-              messages: [
-                { role: 'system', content: systemPrompt },
-                ...recentContext
-              ]
-            })
-          })
-
-          console.log('📥 OpenAI responded with status:', response.status)
-
-          if (!response.ok) {
-            const errorText = await response.text()
-            console.error('❌ OpenAI error:', response.status, errorText)
-            
-            if (response.status === 429 && attempts < 2) {
-              attempts++
-              console.log('⏳ Rate limit, waiting 3s...')
-              await new Promise(resolve => setTimeout(resolve, 3000))
-              continue
-            }
-            
-            throw new Error(`OpenAI error ${response.status}: ${errorText.substring(0, 200)}`)
-          }
-
-          const result = await response.json()
-          console.log('✅ OpenAI success, tokens:', result.usage?.total_tokens || 0)
-          
-          aiResponse = {
-            content: result.choices[0].message.content,
-            tokensUsed: result.usage?.total_tokens || 0,
-            model: 'gpt-4o'
-          }
-          
-          break // Success, exit retry loop
-          
-        } catch (fetchError) {
-          console.error(`❌ Attempt ${attempts + 1} failed:`, fetchError.message)
-          lastError = fetchError
-          
-          if (attempts < 2) {
-            attempts++
-            await new Promise(resolve => setTimeout(resolve, 2000))
-          } else {
-            throw fetchError
-          }
-        }
-      }
-      
-      if (!aiResponse) {
-        throw lastError || new Error('All OpenAI attempts failed')
-      }
-      
-    } catch (aiError) {
-      console.error('❌ AI generation completely failed:', aiError.message)
-      console.error('Stack:', aiError.stack)
-      
-      return NextResponse.json({
-        response: "I'm experiencing technical difficulties right now. Your message was: \"" + message.substring(0, 50) + "...\" - Let me know if you'd like to try again?",
-        error: aiError.message
-      })
-    }
-
-    // Generate tags (with safety)
-    let conversationTags = 'general-support'
-    try {
-      conversationTags = await generateConversationTags(message, aiResponse.content, userContextData, user)
-    } catch (tagError) {
-      console.error('❌ Tag generation failed:', tagError.message)
-    }
-    
-    // Log to Airtable (with safety)
-    try {
-      await logToAirtable({
-        messageId,
-        email: user.email,
-        userMessage: message,
-        solResponse: aiResponse.content,
-        timestamp,
-        tokensUsed: aiResponse.tokensUsed,
-        tags: conversationTags,
-        flaggingAnalysis: { shouldFlag: false, reason: '', addToLibrary: false }
-      })
-      console.log('✅ Logged to Airtable')
-    } catch (airtableError) {
-      console.error('❌ Airtable logging failed (continuing):', airtableError.message)
-    }
-
-    // Update profile (with safety)
-    try {
-      await updateUserProfile(user.email, { 'Last Message Date': timestamp })
-    } catch (profileError) {
-      console.error('❌ Profile update failed:', profileError.message)
-    }
-
-    console.log('=== RETURNING SUCCESSFUL RESPONSE ===')
-
-    return NextResponse.json({
-      response: aiResponse.content,
-      tags: conversationTags,
-      tokensUsed: aiResponse.tokensUsed
-    })
-
-  } catch (error) {
-    console.error('❌❌❌ CRITICAL ERROR IN CHAT API:', error)
-    console.error('Error message:', error.message)
-    console.error('Error stack:', error.stack)
-    
-    return NextResponse.json({
-      response: "Something went wrong. Please try refreshing the page and sending your message again.",
-      error: error.message,
-      stack: error.stack?.substring(0, 500)
-    }, { status: 500 })
-  }
-}
-
-async function triggerPersonalgorithmAnalysis(email, userMessage, solResponse, conversationHistory) {
-  try {
-    setTimeout(async () => {
-      try {
-        const response = await fetch('/api/analyze-message-personalgorithm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            userMessage,
-            solResponse,
-            conversationContext: conversationHistory.slice(-3)
-          })
-        })
-        
-        if (response.ok) {
-          const result = await response.json()
-          console.log('🧠 Personalgorithm™ analysis completed:', result.entriesCreated, 'new insights')
-        }
-      } catch (error) {
-        console.error('Background Personalgorithm™ analysis failed:', error)
-      }
-    }, 1000)
-  } catch (error) {
-    console.error('Error triggering Personalgorithm™ analysis:', error)
-  }
-}
-
-// ==================== SOL AUTO-UPDATE SYSTEM ====================
-
-async function detectAndPerformUpdates(email, userMessage, solResponse, userContextData) {
-  console.log('=== SOL AUTO-UPDATE SYSTEM ACTIVATED ===')
+  // Check if they have emotional processing patterns
+  const emotionalProcessor = userContextData.personalgorithmData?.some(p =>
+    p.tags?.toLowerCase().includes('emotional') ||
+    p.notes?.toLowerCase().includes('emotional')
+  )
   
-  try {
-    // Analyze conversation for update triggers
-    const updateAnalysis = await analyzeConversationForUpdates(userMessage, solResponse, userContextData)
-    
-    // Perform updates based on analysis
-    if (updateAnalysis.shouldUpdateProfile) {
-      await performProfileUpdates(email, updateAnalysis.profileUpdates, userContextData)
-    }
-    
-    if (updateAnalysis.shouldCreatePersonalgorithm) {
-      await createPersonalgorithmEntryNew(email, updateAnalysis.personalgorithmInsight)
-    }
-    
-    if (updateAnalysis.shouldUpdateGoals) {
-      await updateUserGoals(email, updateAnalysis.newGoals, userContextData)
-    }
-    
-    if (updateAnalysis.shouldUpdateVision) {
-      await updateUserVision(email, updateAnalysis.visionUpdate, userContextData)
-    }
-    
-    console.log('✅ Sol auto-updates completed')
-    
-  } catch (error) {
-    console.error('❌ Auto-update system error:', error)
-    // Don't crash the main chat flow if updates fail
+  if (emotionalProcessor) {
+    response += `I can feel the depth and intention you brought to this. `
   }
-}
-
-async function analyzeConversationForUpdates(userMessage, solResponse, userContextData) {
-  try {
-    const analysisPrompt = `You are Sol™ analyzing a coaching conversation to determine what user profile updates should be made.
-
-USER MESSAGE: "${userMessage}"
-SOL RESPONSE: "${solResponse}"
-
-CURRENT USER CONTEXT:
-${userContextData.contextSummary || 'Limited context available'}
-
-Analyze this conversation and respond in this EXACT format:
-
-PROFILE_UPDATE: true/false
-PROFILE_UPDATES: {
-  "Current State": "new emotional/business state if changed",
-  "Coaching Style Match": "what coaching approach works for this user",
-  "Notes from Sol": "key insights about this user",
-  "Tags": "business-type, coaching-style, current-focus"
-}
-
-PERSONALGORITHM: true/false
-PERSONALGORITHM_INSIGHT: "specific pattern about how this user operates/transforms"
-
-GOALS_UPDATE: true/false
-NEW_GOALS: "updated goals if they've shifted"
-
-VISION_UPDATE: true/false
-VISION_UPDATE: "updated vision if it's evolved"
-
-Only set things to true if there's a SIGNIFICANT update worth logging.`
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        max_tokens: 400,
-        temperature: 0.3,
-        messages: [{ role: 'user', content: analysisPrompt }]
-      })
-    })
-
-    if (!response.ok) {
-      console.error('Update analysis failed:', response.status)
-      return { shouldUpdateProfile: false }
-    }
-
-    const result = await response.json()
-    const analysis = result.choices[0].message.content
-
-    // Parse the structured response
-    const shouldUpdateProfile = analysis.includes('PROFILE_UPDATE: true')
-    const shouldCreatePersonalgorithm = analysis.includes('PERSONALGORITHM: true')
-    const shouldUpdateGoals = analysis.includes('GOALS_UPDATE: true')
-    const shouldUpdateVision = analysis.includes('VISION_UPDATE: true')
-
-    // Extract update data
-    let profileUpdates = {}
-    let personalgorithmInsight = ''
-    let newGoals = ''
-    let visionUpdate = ''
-
-    if (shouldUpdateProfile) {
-      // Parse profile updates from the structured response
-      const profileMatch = analysis.match(/PROFILE_UPDATES: ({[\s\S]*?})/);
-      if (profileMatch) {
-        try {
-          profileUpdates = JSON.parse(profileMatch[1])
-        } catch (e) {
-          console.error('Failed to parse profile updates:', e)
-        }
-      }
-    }
-
-    if (shouldCreatePersonalgorithm) {
-      const personalgorithmMatch = analysis.match(/PERSONALGORITHM_INSIGHT: "([^"]+)"/);
-      if (personalgorithmMatch) {
-        personalgorithmInsight = personalgorithmMatch[1]
-      }
-    }
-
-    if (shouldUpdateGoals) {
-      const goalsMatch = analysis.match(/NEW_GOALS: "([^"]+)"/);
-      if (goalsMatch) {
-        newGoals = goalsMatch[1]
-      }
-    }
-
-    if (shouldUpdateVision) {
-      const visionMatch = analysis.match(/VISION_UPDATE: "([^"]+)"/);
-      if (visionMatch) {
-        visionUpdate = visionMatch[1]
-      }
-    }
-
-    return {
-      shouldUpdateProfile,
-      shouldCreatePersonalgorithm,
-      shouldUpdateGoals,
-      shouldUpdateVision,
-      profileUpdates,
-      personalgorithmInsight,
-      newGoals,
-      visionUpdate
-    }
-
-  } catch (error) {
-    console.error('Error analyzing conversation for updates:', error)
-    return { shouldUpdateProfile: false }
+  
+  // Check if they need validation before action
+  const needsValidation = userContextData.personalgorithmData?.some(p =>
+    p.notes?.toLowerCase().includes('validation') ||
+    p.notes?.toLowerCase().includes('acknowledgment')
+  )
+  
+  if (needsValidation) {
+    response += `This kind of clarity work is powerful. `
   }
+  
+  response += `While I take everything in, what part of your vision feels most alive to you right now?`
+  
+  return response
 }
 
-async function performProfileUpdates(email, profileUpdates, userContextData) {
-  try {
-    console.log('Performing profile updates for:', email)
-    
-    // Clean and prepare updates
-    const cleanUpdates = {}
-    
-    if (profileUpdates['Current State'] && profileUpdates['Current State'] !== 'unchanged') {
-      cleanUpdates['Current State'] = profileUpdates['Current State']
-    }
-    
-    if (profileUpdates['Coaching Style Match'] && profileUpdates['Coaching Style Match'] !== 'unchanged') {
-      cleanUpdates['Coaching Style Match'] = profileUpdates['Coaching Style Match']
-    }
-    
-    if (profileUpdates['Notes from Sol'] && profileUpdates['Notes from Sol'] !== 'unchanged') {
-      // Append to existing notes rather than overwrite
-      const existingNotes = userContextData.userProfile?.['Notes from Sol'] || ''
-      const newNote = `${new Date().toLocaleDateString()}: ${profileUpdates['Notes from Sol']}`
-      
-      if (existingNotes) {
-        cleanUpdates['Notes from Sol'] = `${newNote}\n\n${existingNotes}`
-      } else {
-        cleanUpdates['Notes from Sol'] = newNote
-      }
-    }
-    
-    if (profileUpdates['Tags'] && profileUpdates['Tags'] !== 'unchanged') {
-      // Merge with existing tags
-      const existingTags = userContextData.userProfile?.['Tags'] || ''
-      const newTags = profileUpdates['Tags']
-      
-      if (existingTags) {
-        const allTags = `${existingTags}, ${newTags}`.split(',').map(tag => tag.trim())
-        const uniqueTags = [...new Set(allTags)].filter(tag => tag.length > 0)
-        cleanUpdates['Tags'] = uniqueTags.join(', ')
-      } else {
-        cleanUpdates['Tags'] = newTags
-      }
-    }
-
-    if (Object.keys(cleanUpdates).length > 0) {
-      await updateUserProfile(email, cleanUpdates)
-      console.log('✅ Profile updates applied:', Object.keys(cleanUpdates))
-    }
-
-  } catch (error) {
-    console.error('Error performing profile updates:', error)
-  }
-}
-
-async function updateUserGoals(email, newGoals, userContextData) {
-  try {
-    console.log('Updating user goals for:', email)
-    
-    const currentGoals = userContextData.userProfile?.['Current Goals'] || ''
-    
-    // Only update if goals have meaningfully changed
-    if (newGoals && newGoals.toLowerCase() !== currentGoals.toLowerCase()) {
-      await updateUserProfile(email, {
-        'Current Goals': newGoals
-      })
-      console.log('✅ Goals updated')
-    }
-
-  } catch (error) {
-    console.error('Error updating user goals:', error)
-  }
-}
-
-async function updateUserVision(email, visionUpdate, userContextData) {
-  try {
-    console.log('Updating user vision for:', email)
-    
-    const currentVision = userContextData.userProfile?.['Current Vision'] || ''
-    
-    // Only update if vision has meaningfully evolved
-    if (visionUpdate && visionUpdate.toLowerCase() !== currentVision.toLowerCase()) {
-      // Add current vision to history before updating
-      const currentHistory = userContextData.userProfile?.['Vision History'] || ''
-      const dateStamp = new Date().toLocaleDateString()
-      
-      let newHistory = currentHistory
-      if (currentVision) {
-        newHistory = `${dateStamp}: ${currentVision}\n\n${currentHistory}`
-      }
-      
-      await updateUserProfile(email, {
-        'Current Vision': visionUpdate,
-        'Vision History': newHistory
-      })
-      console.log('✅ Vision updated and history preserved')
-    }
-
-  } catch (error) {
-    console.error('Error updating user vision:', error)
-  }
-}
-
-async function createPersonalgorithmEntryNew(email, notes, tags = ['auto-generated']) {
-  try {
-    const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
-    console.log('Creating Personalgorithm™ entry for:', email)
-    console.log('Notes:', notes.substring(0, 100) + '...')
-    
-    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        fields: {
-          'Personalgorithm™ ID': personalgorithmId,
-          'User ID': email, // FIXED: Use email directly as single line text
-          'Personalgorithm™ Notes': notes,
-          'Tags': Array.isArray(tags) ? tags.join(', ') : tags
-          // Date created will be auto-generated by Airtable
-        }
-      })
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Failed to create Personalgorithm™ entry:', response.status, errorText)
-      return null
-    }
-
-    const result = await response.json()
-    console.log('✅ Personalgorithm™ entry created successfully:', result.id)
-    return result
-    
-  } catch (error) {
-    console.error('Error creating Personalgorithm™ entry:', error)
-    return null
-  }
-}
-
-async function updateTranscriptDigest(email) {
-  try {
-    // Get user's messages from the past week
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    const encodedEmail = encodeURIComponent(email)
-    
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Messages?filterByFormula=AND({User ID}="${encodedEmail}", {Timestamp}>="${weekAgo}")&sort[0][field]=Timestamp&sort[0][direction]=desc&maxRecords=50`
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) return
-
-    const data = await response.json()
-    
-    if (data.records.length === 0) return
-
-    // Create weekly digest
-    const conversations = data.records.map(record => ({
-      user: record.fields['User Message'],
-      sol: record.fields['Sol Response'],
-      timestamp: record.fields['Timestamp']
-    }))
-
-    const digestPrompt = `Create a 2-3 sentence summary of this week's coaching conversations:
-
-${conversations.map(conv => `USER: ${conv.user}\nSOL: ${conv.sol}`).join('\n\n')}
-
-Focus on: key themes discussed, breakthroughs or shifts, and main areas of focus.`
-
-    const digestResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        max_tokens: 200,
-        temperature: 0.3,
-        messages: [{ role: 'user', content: digestPrompt }]
-      })
-    })
-
-    if (digestResponse.ok) {
-      const digestResult = await digestResponse.json()
-      const weeklyDigest = digestResult.choices[0].message.content
-
-      // Update user profile with weekly digest
-      const currentDigest = userContextData.userProfile?.['Transcript Digest'] || ''
-      const dateStamp = new Date().toLocaleDateString()
-      const newDigest = `${dateStamp}: ${weeklyDigest}\n\n${currentDigest}`
-
-      await updateUserProfile(email, {
-        'Transcript Digest': newDigest
-      })
-
-      console.log('✅ Weekly transcript digest updated')
-    }
-
-  } catch (error) {
-    console.error('Error updating transcript digest:', error)
-  }
-}
-
-// ==================== CONTEXT FETCH FUNCTIONS ====================
+// ==================== FETCH COMPLETE USER CONTEXT ====================
 
 async function fetchUserContextDirect(email) {
-  console.log('Fetching comprehensive user context directly for:', email)
-
-  const [
-    userProfile,
-    recentMessages,
-    visioningData,
-    personalgorithmData,
-    businessPlans,
-    coachingMethods,
-    weeklyCheckins,
-    solNotes
-  ] = await Promise.allSettled([
-    fetchUserProfileDirect(email),
-    fetchRecentMessagesDirect(email),
-    fetchVisioningDataDirect(email),
-    fetchPersonalgorithmDataDirect(email),
-    fetchBusinessPlansDirect(email),
-    fetchCoachingMethodsDirect(),
-    fetchWeeklyCheckinsDirect(email),
-    fetchSolNotesDirect()
-  ])
-
-  const results = {
-    userProfile: userProfile.status === 'fulfilled' ? userProfile.value : null,
-    recentMessages: recentMessages.status === 'fulfilled' ? recentMessages.value : [],
-    visioningData: visioningData.status === 'fulfilled' ? visioningData.value : null,
-    personalgorithmData: personalgorithmData.status === 'fulfilled' ? personalgorithmData.value : [],
-    businessPlans: businessPlans.status === 'fulfilled' ? businessPlans.value : [],
-    coachingMethods: coachingMethods.status === 'fulfilled' ? coachingMethods.value : [],
-    weeklyCheckins: weeklyCheckins.status === 'fulfilled' ? weeklyCheckins.value : [],
-    solNotes: solNotes.status === 'fulfilled' ? solNotes.value : []
-  }
-
-  const failed = [userProfile, recentMessages, visioningData, personalgorithmData, businessPlans, coachingMethods, weeklyCheckins, solNotes]
-    .map((result, index) => ({ result, name: ['userProfile', 'recentMessages', 'visioningData', 'personalgorithmData', 'businessPlans', 'coachingMethods', 'weeklyCheckins', 'solNotes'][index] }))
-    .filter(({ result }) => result.status === 'rejected')
-
-  if (failed.length > 0) {
-    console.log('❌ Failed to fetch:', failed.map(f => f.name).join(', '))
-    failed.forEach(({ name, result }) => {
-      console.error(`${name} error:`, result.reason?.message || result.reason)
-    })
-  }
-
-  const contextSummary = buildEnhancedContextSummary(results)
-
-  console.log('=== DIRECT CONTEXT FETCH SUMMARY ===')
-  console.log('✅ User Profile:', !!results.userProfile)
-  console.log('📧 Recent Messages:', results.recentMessages.length)
-  console.log('🎯 Visioning Data:', !!results.visioningData)
-  console.log('🧠 Personalgorithm Entries:', results.personalgorithmData.length)
-  console.log('📋 Business Plans:', results.businessPlans.length)
-  console.log('📚 Coaching Methods:', results.coachingMethods.length)
-  console.log('📊 Weekly Check-ins:', results.weeklyCheckins.length)
-  console.log('🤖 Sol Notes:', results.solNotes.length)
-  console.log('=== END SUMMARY ===')
-
-  return {
-    ...results,
-    contextSummary
-  }
-}
-
-async function fetchSolNotesDirect() {
+  console.log('Fetching complete context for:', email)
+  
   try {
-    console.log('Fetching Sol™ notes/brain content')
-    
-    // Simpler query without sort that might be causing 422
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Sol™?maxRecords=50`
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    })
+    const [
+      userProfile,
+      personalgorithmData,
+      visioningData,
+      businessPlans,
+      weeklyCheckins,
+      coachingMethods,
+      solBrain,
+      recentMessages
+    ] = await Promise.allSettled([
+      fetchUserProfileDirect(email),
+      fetchPersonalgorithmDirect(email),
+      fetchVisioningDataDirect(email),
+      fetchBusinessPlansDirect(email),
+      fetchWeeklyCheckinsDirect(email),
+      fetchCoachingMethodsDirect(),
+      fetchSolNotesDirect(),
+      fetchRecentMessagesDirect(email)
+    ])
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('❌ Sol™ notes fetch failed:', response.status)
-      console.error('❌ Error details:', errorText)
-      
-      // Return empty array instead of crashing
-      return []
+    const results = {
+      userProfile: userProfile.status === 'fulfilled' ? userProfile.value : null,
+      personalgorithmData: personalgorithmData.status === 'fulfilled' ? personalgorithmData.value : [],
+      visioningData: visioningData.status === 'fulfilled' ? visioningData.value : null,
+      businessPlans: businessPlans.status === 'fulfilled' ? businessPlans.value : [],
+      weeklyCheckins: weeklyCheckins.status === 'fulfilled' ? weeklyCheckins.value : [],
+      coachingMethods: coachingMethods.status === 'fulfilled' ? coachingMethods.value : [],
+      solBrain: solBrain.status === 'fulfilled' ? solBrain.value : [],
+      recentMessages: recentMessages.status === 'fulfilled' ? recentMessages.value : []
     }
 
-    const data = await response.json()
-    
-    if (!data.records || data.records.length === 0) {
-      console.log('⚠️ No Sol™ notes found in Airtable')
-      return []
-    }
-    
-    const solNotes = data.records
-      .map(record => {
-        try {
-          return {
-            solId: record.fields['Sol ID'] || `sol_${Date.now()}`,
-            note: record.fields['Note'] || '',
-            dateSubmitted: record.fields['Date Submitted'],
-            tags: record.fields['Tags'] || '',
-            link: record.fields['Link']
-          }
-        } catch (recordError) {
-          console.error('Error processing Sol note record:', recordError)
-          return null
-        }
-      })
-      .filter(note => note && note.note && note.note.trim().length > 0)
+    console.log('=== CONTEXT SUMMARY ===')
+    console.log('👤 User Profile:', !!results.userProfile)
+    console.log('🧠 Personalgorithm™:', results.personalgorithmData.length)
+    console.log('🎯 Visioning Data:', !!results.visioningData)
+    console.log('💼 Business Plans:', results.businessPlans.length)
+    console.log('📊 Weekly Check-ins:', results.weeklyCheckins.length)
+    console.log('📚 Coaching Methods:', results.coachingMethods.length)
+    console.log('🤖 Sol™ Brain:', results.solBrain.length)
+    console.log('💬 Recent Messages:', results.recentMessages.length)
 
-    console.log('✅ Found', solNotes.length, 'Sol™ brain notes')
-    return solNotes
+    return results
 
   } catch (error) {
-    console.error('❌ Error fetching Sol™ notes:', error)
-    // Return empty array so app doesn't crash
-    return []
+    console.error('❌ Error fetching user context:', error)
+    return {
+      userProfile: null,
+      personalgorithmData: [],
+      visioningData: null,
+      businessPlans: [],
+      weeklyCheckins: [],
+      coachingMethods: [],
+      solBrain: [],
+      recentMessages: []
+    }
   }
 }
 
-// ==================== HELPER FUNCTION ====================
-
-async function getUserRecordId(email) {
-  try {
-    const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      console.error('❌ Could not find user record')
-      return null
-    }
-
-    const data = await response.json()
-    
-    if (data.records.length === 0) {
-      console.log('⚠️ No user record found for:', email)
-      return null
-    }
-
-    return data.records[0].id
-
-  } catch (error) {
-    console.error('❌ Error getting user record ID:', error)
-    return null
-  }
-}
-
-// ==================== FETCH FUNCTIONS ====================
+// ==================== INDIVIDUAL FETCH FUNCTIONS ====================
 
 async function fetchUserProfileDirect(email) {
   try {
@@ -1045,13 +345,12 @@ async function fetchUserProfileDirect(email) {
     const data = await response.json()
     
     if (data.records.length === 0) {
-      console.log('⚠️ No user profile found for:', email)
+      console.log('⚠️ No user profile found')
       return null
     }
 
-    const profile = data.records[0].fields
-    console.log('✅ User profile found with rich context')
-    return profile
+    console.log('✅ User profile found')
+    return data.records[0].fields
 
   } catch (error) {
     console.error('❌ Error fetching user profile:', error)
@@ -1059,13 +358,15 @@ async function fetchUserProfileDirect(email) {
   }
 }
 
-async function fetchPersonalgorithmDataDirect(email) {
+async function fetchPersonalgorithmDirect(email) {
   try {
-    console.log('Fetching Personalgorithm™ data for:', email)
+    console.log('Fetching Personalgorithm™ for:', email)
     
-    // FIXED: Filter by email directly since User ID field contains email
-    const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=10`
+    // Get User record ID first
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) return []
+    
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™?filterByFormula=FIND("${userRecordId}", ARRAYJOIN({User}))>0&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=50`
     
     const response = await fetch(url, {
       headers: {
@@ -1075,19 +376,19 @@ async function fetchPersonalgorithmDataDirect(email) {
     })
 
     if (!response.ok) {
-      console.error('❌ Personalgorithm™ data fetch failed:', response.status)
+      console.error('❌ Personalgorithm™ fetch failed:', response.status)
       return []
     }
 
     const data = await response.json()
-    
     const personalgorithm = data.records.map(record => ({
+      id: record.fields['Personalgorithm™ ID'],
       notes: record.fields['Personalgorithm™ Notes'],
       dateCreated: record.fields['Date created'],
       tags: record.fields['Tags'] || ''
-    })).filter(item => item.notes)
+    }))
 
-    console.log('✅ Found', personalgorithm.length, 'Personalgorithm™ entries')
+    console.log('✅ Found', personalgorithm.length, 'Personalgorithm™ insights')
     return personalgorithm
 
   } catch (error) {
@@ -1096,79 +397,10 @@ async function fetchPersonalgorithmDataDirect(email) {
   }
 }
 
-async function fetchBusinessPlansDirect(email) {
-  try {
-    console.log('Fetching business plans for:', email)
-    
-    // Get User record ID first
-    const userRecordId = await getUserRecordId(email)
-    if (!userRecordId) return []
-    
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned Business® Plans?filterByFormula=FIND("${userRecordId}", ARRAYJOIN({User ID}))>0&sort[0][field]=Date Submitted&sort[0][direction]=desc&maxRecords=2`
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      console.error('❌ Business plans fetch failed:', response.status)
-      return []
-    }
-
-    const data = await response.json()
-    const plans = data.records.map(record => record.fields)
-    console.log('✅ Found', plans.length, 'business plans')
-    return plans
-
-  } catch (error) {
-    console.error('❌ Error fetching business plans:', error)
-    return []
-  }
-}
-
-async function fetchWeeklyCheckinsDirect(email) {
-  try {
-    console.log('Fetching weekly check-ins for:', email)
-    
-    // Get User record ID first
-    const userRecordId = await getUserRecordId(email)
-    if (!userRecordId) return []
-    
-    const cutoffDate = new Date(Date.now() - 4 * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Weekly Check-in?filterByFormula=AND(FIND("${userRecordId}", ARRAYJOIN({User ID}))>0, IS_AFTER({Check-in Date}, "${cutoffDate}"))&sort[0][field]=Check-in Date&sort[0][direction]=desc&maxRecords=4`
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      console.error('❌ Weekly check-ins fetch failed:', response.status)
-      return []
-    }
-
-    const data = await response.json()
-    const checkins = data.records.map(record => record.fields)
-    console.log('✅ Found', checkins.length, 'weekly check-ins')
-    return checkins
-
-  } catch (error) {
-    console.error('❌ Error fetching weekly check-ins:', error)
-    return []
-  }
-}
-
 async function fetchVisioningDataDirect(email) {
   try {
     console.log('Fetching visioning data for:', email)
     
-    // Get User record ID first
     const userRecordId = await getUserRecordId(email)
     if (!userRecordId) return null
     
@@ -1202,11 +434,77 @@ async function fetchVisioningDataDirect(email) {
   }
 }
 
+async function fetchBusinessPlansDirect(email) {
+  try {
+    console.log('Fetching business plans for:', email)
+    
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) return []
+    
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned Business® Plans?filterByFormula=FIND("${userRecordId}", ARRAYJOIN({User ID}))>0&sort[0][field]=Date Submitted&sort[0][direction]=desc&maxRecords=2`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      console.error('❌ Business plans fetch failed:', response.status)
+      return []
+    }
+
+    const data = await response.json()
+    const plans = data.records.map(record => record.fields)
+    console.log('✅ Found', plans.length, 'business plans')
+    return plans
+
+  } catch (error) {
+    console.error('❌ Error fetching business plans:', error)
+    return []
+  }
+}
+
+async function fetchWeeklyCheckinsDirect(email) {
+  try {
+    console.log('Fetching weekly check-ins for:', email)
+    
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) return []
+    
+    const cutoffDate = new Date(Date.now() - 4 * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Weekly Check-in?filterByFormula=AND(FIND("${userRecordId}", ARRAYJOIN({User ID}))>0, IS_AFTER({Check-in Date}, "${cutoffDate}"))&sort[0][field]=Check-in Date&sort[0][direction]=desc&maxRecords=4`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      console.error('❌ Weekly check-ins fetch failed:', response.status)
+      return []
+    }
+
+    const data = await response.json()
+    const checkins = data.records.map(record => record.fields)
+    console.log('✅ Found', checkins.length, 'weekly check-ins')
+    return checkins
+
+  } catch (error) {
+    console.error('❌ Error fetching weekly check-ins:', error)
+    return []
+  }
+}
+
 async function fetchCoachingMethodsDirect() {
   try {
     console.log('Fetching Aligned Business® Method content')
     
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned Business® Method?maxRecords=15`
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned Business® Method?maxRecords=20`
     
     const response = await fetch(url, {
       headers: {
@@ -1223,7 +521,13 @@ async function fetchCoachingMethodsDirect() {
     const data = await response.json()
     const methods = data.records.map(record => ({
       name: record.fields['Name of Lesson'],
-      content: record.fields['Lesson Content']
+      category: record.fields['Category'],
+      description: record.fields['Description'],
+      content: record.fields['Lesson Content'],
+      useCases: record.fields['Use Cases'],
+      emotionalStates: record.fields['Emotional State Tags'],
+      supportingPrompts: record.fields['Supporting Prompts'],
+      solNotes: record.fields['Sol Notes for User Application']
     })).filter(method => method.content)
 
     console.log('✅ Found', methods.length, 'coaching methods')
@@ -1231,6 +535,43 @@ async function fetchCoachingMethodsDirect() {
 
   } catch (error) {
     console.error('❌ Error fetching coaching methods:', error)
+    return []
+  }
+}
+
+async function fetchSolNotesDirect() {
+  try {
+    console.log('Fetching Sol™ brain notes')
+    
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Sol™?maxRecords=50&sort[0][field]=Date Submitted&sort[0][direction]=desc`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      console.error('❌ Sol™ brain fetch failed:', response.status)
+      return []
+    }
+
+    const data = await response.json()
+    
+    const solBrain = data.records.map(record => ({
+      solId: record.fields['Sol ID'],
+      note: record.fields['Note'],
+      dateSubmitted: record.fields['Date Submitted'],
+      tags: record.fields['Tags'] || '',
+      link: record.fields['Link']
+    })).filter(note => note.note)
+
+    console.log('✅ Found', solBrain.length, 'Sol™ brain notes')
+    return solBrain
+
+  } catch (error) {
+    console.error('❌ Error fetching Sol™ brain:', error)
     return []
   }
 }
@@ -1272,98 +613,38 @@ async function fetchRecentMessagesDirect(email) {
   }
 }
 
-// ==================== CONTEXT SUMMARY BUILDER ====================
-
-function buildEnhancedContextSummary(results) {
-  let summary = "=== COMPREHENSIVE USER CONTEXT SUMMARY ===\n\n"
-  
-  if (results.userProfile) {
-    const profile = results.userProfile
-    summary += `👤 USER PROFILE:\n`
-    summary += `Email: ${profile['User ID'] || 'Unknown'}\n`
-    summary += `Member Since: ${profile['Date Joined'] || 'Unknown'}\n`
-    summary += `Membership: ${profile['Membership Plan'] || 'Standard'}\n\n`
+async function getUserRecordId(email) {
+  try {
+    const encodedEmail = encodeURIComponent(email)
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
     
-    if (profile['Current Vision']) {
-      summary += `🎯 CURRENT VISION:\n${profile['Current Vision']}\n\n`
-    }
-    
-    if (profile['Current State']) {
-      summary += `📍 CURRENT STATE:\n${profile['Current State']}\n\n`
-    }
-    
-    if (profile['Current Goals']) {
-      summary += `🏆 CURRENT GOALS:\n${profile['Current Goals']}\n\n`
-    }
-    
-    if (profile['Coaching Style Match']) {
-      summary += `🎯 COACHING STYLE PREFERENCES:\n${profile['Coaching Style Match']}\n\n`
-    }
-    
-    if (profile['Notes from Sol']) {
-      summary += `🤖 SOL'S PREVIOUS INSIGHTS:\n${profile['Notes from Sol']}\n\n`
-    }
-    
-    if (profile['Transcript Digest']) {
-      summary += `📝 RECENT CONVERSATION PATTERNS:\n${profile['Transcript Digest']}\n\n`
-    }
-  }
-  
-  if (results.personalgorithmData && results.personalgorithmData.length > 0) {
-    summary += `🧠 KEY PERSONALGORITHM™ INSIGHTS:\n`
-    results.personalgorithmData.forEach((insight, index) => {
-      summary += `${index + 1}. ${insight.notes}\n`
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
     })
-    summary += "\n"
+
+    if (!response.ok) return null
+    const data = await response.json()
+    return data.records.length > 0 ? data.records[0].id : null
+
+  } catch (error) {
+    console.error('Error getting user record ID:', error)
+    return null
   }
-  
-  if (results.businessPlans && results.businessPlans.length > 0) {
-    const latestPlan = results.businessPlans[0]
-    summary += `💼 CURRENT BUSINESS CONTEXT:\n`
-    if (latestPlan['Future Vision']) {
-      summary += `Vision: ${latestPlan['Future Vision']}\n`
-    }
-    if (latestPlan['Top 3 Goals']) {
-      summary += `Goals: ${latestPlan['Top 3 Goals']}\n`
-    }
-    summary += "\n"
-  }
-  
-  if (results.weeklyCheckins && results.weeklyCheckins.length > 0) {
-    const latestCheckin = results.weeklyCheckins[0]
-    summary += `📊 LATEST WEEKLY CHECK-IN:\n`
-    if (latestCheckin['This is who I am now...']) {
-      summary += `Identity: ${latestCheckin['This is who I am now...']}\n`
-    }
-    if (latestCheckin['What worked this week?']) {
-      summary += `Wins: ${latestCheckin['What worked this week?']}\n`
-    }
-    summary += "\n"
-  }
-  
-  return summary
 }
 
-// ==================== ENHANCED AI RESPONSE GENERATION ====================
+// ==================== RESPONSE GENERATION (PERSONALGORITHM™ FIRST) ====================
 
-async function generatePersonalizedOpenAIResponse(userMessage, conversationHistory, userContextData, user) {
+async function generatePersonalizedResponse(userMessage, conversationHistory, userContextData, user) {
   try {
-    // Check for visioning guidance first
-    const visioningGuidance = await handleVisioningGuidance(userMessage, userContextData, user)
-    if (visioningGuidance) {
-      return {
-        content: visioningGuidance.content,
-        tokensUsed: 0,
-        model: 'visioning-guidance'
-      }
-    }
-
-    // CHANGED: Always use GPT-4o (the best model for emotional intelligence)
-    const model = 'gpt-4o'
+    const useGPT4 = shouldUseGPT4(userMessage, userContextData)
+    const model = useGPT4 ? 'gpt-4-turbo-preview' : 'gpt-3.5-turbo'
     
     console.log(`Using ${model} for response generation`)
 
-    const recentContext = conversationHistory.slice(-10).map(msg => ({
+    const recentContext = conversationHistory.slice(-6).map(msg => ({
       role: msg.role === 'sol' ? 'assistant' : 'user',
       content: msg.content
     }))
@@ -1373,103 +654,259 @@ async function generatePersonalizedOpenAIResponse(userMessage, conversationHisto
       content: userMessage
     })
 
-    let contextPrompt = buildEnhancedComprehensivePrompt(userContextData, user)
+    // Build system prompt with Personalgorithm™ FIRST
+    const systemPrompt = buildPersonalgorithmDrivenPrompt(userContextData, user)
 
-    // Rate limit retry logic
-    let attempts = 0
-    let lastError = null
-    
-    while (attempts < 3) {
-      try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: useGPT4 ? 800 : 400,
+        temperature: 0.7,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
           },
-          body: JSON.stringify({
-            model: model,
-            max_tokens: 600, // Slightly reduced for cost efficiency
-            temperature: 0.7,
-            messages: [
-              {
-                role: 'system',
-                content: contextPrompt
-              },
-              ...recentContext
-            ]
-          })
-        })
+          ...recentContext
+        ]
+      })
+    })
 
-        if (!response.ok) {
-          const errorData = await response.json()
-          
-          // If rate limit (429), wait and retry
-          if (response.status === 429) {
-            attempts++
-            console.log(`⏳ Rate limit hit, attempt ${attempts}/3, waiting...`)
-            
-            if (attempts < 3) {
-              // Wait 3 seconds before retry
-              await new Promise(resolve => setTimeout(resolve, 3000))
-              continue
-            }
-          }
-          
-          lastError = new Error(`OpenAI API error: ${response.status}`)
-          console.error('OpenAI API error:', errorData)
-          throw lastError
-        }
-
-        const result = await response.json()
-        
-        console.log('✅ Response generated successfully')
-        console.log('📊 Tokens used:', result.usage.total_tokens)
-        
-        return {
-          content: result.choices[0].message.content,
-          tokensUsed: result.usage.total_tokens,
-          model: model
-        }
-        
-      } catch (fetchError) {
-        lastError = fetchError
-        
-        if (fetchError.message.includes('429') && attempts < 2) {
-          attempts++
-          console.log(`⏳ Retrying after error, attempt ${attempts}/3`)
-          await new Promise(resolve => setTimeout(resolve, 3000))
-          continue
-        }
-        
-        break
-      }
+    if (!response.ok) {
+      const errorData = await response.json()
+      console.error('OpenAI API error:', errorData)
+      throw new Error(`OpenAI API error: ${response.status}`)
     }
+
+    const result = await response.json()
     
-    throw lastError || new Error('Failed after 3 attempts')
+    return {
+      content: result.choices[0].message.content,
+      tokensUsed: result.usage.total_tokens,
+      model: model
+    }
 
   } catch (error) {
     console.error('OpenAI response error:', error)
-    return {
-      content: "I'm having a moment of connection difficulty, but I'm still here with you. Your message was important - would you mind sharing that again?",
-      tokensUsed: 0,
-      model: 'error'
-    }
+    throw error
   }
 }
 
+function buildPersonalgorithmDrivenPrompt(userContextData, user) {
+  let systemPrompt = `You are Sol™, an AI business partner trained with Kelsey's Aligned Business® Method.
 
-function shouldUseGPT4(userMessage, userContextData) {
-  // Always use GPT-4o for Sol - it's the best for emotional intelligence
-  // and it's actually cheaper than the old turbo model
-  return true
+USER: ${user.email}
+
+`
+
+  // ==================== PRIMARY: PERSONALGORITHM™ ====================
+  
+  if (userContextData.personalgorithmData?.length > 0) {
+    systemPrompt += `=== PRIMARY INTELLIGENCE: THIS PERSON'S PERSONALGORITHM™ ===\n`
+    systemPrompt += `This is your MOST IMPORTANT guide for supporting this user.\n`
+    systemPrompt += `Every response must be filtered through these patterns FIRST:\n\n`
+    
+    // Group patterns by type
+    const patterns = groupPersonalgorithmPatterns(userContextData.personalgorithmData)
+    
+    if (patterns.communication.length > 0) {
+      systemPrompt += `Their Communication & Language Patterns:\n`
+      patterns.communication.forEach(p => systemPrompt += `- ${p.notes}\n`)
+      systemPrompt += `\n`
+    }
+    
+    if (patterns.transformation.length > 0) {
+      systemPrompt += `What Actually Creates Transformation for Them:\n`
+      patterns.transformation.forEach(p => systemPrompt += `- ${p.notes}\n`)
+      systemPrompt += `\n`
+    }
+    
+    if (patterns.decision.length > 0) {
+      systemPrompt += `How They Make Decisions:\n`
+      patterns.decision.forEach(p => systemPrompt += `- ${p.notes}\n`)
+      systemPrompt += `\n`
+    }
+    
+    if (patterns.emotional.length > 0) {
+      systemPrompt += `Their Emotional & Nervous System Patterns:\n`
+      patterns.emotional.forEach(p => systemPrompt += `- ${p.notes}\n`)
+      systemPrompt += `\n`
+    }
+    
+    if (patterns.resistance.length > 0) {
+      systemPrompt += `Their Resistance Patterns & Growth Edges:\n`
+      patterns.resistance.forEach(p => systemPrompt += `- ${p.notes}\n`)
+      systemPrompt += `\n`
+    }
+    
+    if (patterns.other.length > 0) {
+      systemPrompt += `Other Key Patterns:\n`
+      patterns.other.forEach(p => systemPrompt += `- ${p.notes}\n`)
+      systemPrompt += `\n`
+    }
+    
+    systemPrompt += `APPLY THESE PATTERNS BY:\n`
+    systemPrompt += `- Matching their communication style naturally\n`
+    systemPrompt += `- Using their transformation triggers strategically\n`
+    systemPrompt += `- Respecting their decision-making process\n`
+    systemPrompt += `- Recognizing their emotional states\n`
+    systemPrompt += `- Anticipating their resistance points\n\n`
+  }
+
+  // ==================== SECONDARY: SOL™ BRAIN ====================
+  
+  if (userContextData.solBrain?.length > 0) {
+    systemPrompt += `=== SECONDARY: GENERAL OPERATING PRINCIPLES ===\n`
+    userContextData.solBrain.slice(0, 10).forEach(brain => {
+      systemPrompt += `${brain.note}\n`
+    })
+    systemPrompt += `\n`
+  }
+
+  // ==================== TERTIARY: ALIGNED BUSINESS® METHOD ====================
+  
+  if (userContextData.coachingMethods?.length > 0) {
+    systemPrompt += `=== TERTIARY: KELSEY'S FRAMEWORKS TO APPLY ===\n`
+    userContextData.coachingMethods.slice(0, 5).forEach(method => {
+      systemPrompt += `**${method.name}**\n`
+      if (method.content) systemPrompt += `${method.content}\n`
+      if (method.useCases) systemPrompt += `Use when: ${method.useCases}\n`
+      systemPrompt += `\n`
+    })
+  }
+
+  // ==================== CONTEXT ====================
+  
+  systemPrompt += `=== CURRENT CONTEXT ===\n\n`
+  
+  // User Profile
+  if (userContextData.userProfile) {
+    const p = userContextData.userProfile
+    if (p['Current Vision']) systemPrompt += `Vision: ${p['Current Vision']}\n`
+    if (p['Current Goals']) systemPrompt += `Goals: ${p['Current Goals']}\n`
+    if (p['Current State']) systemPrompt += `State: ${p['Current State']}\n`
+    if (p['Notes from Sol']) systemPrompt += `Your previous insights: ${p['Notes from Sol']}\n`
+    systemPrompt += `\n`
+  }
+  
+  // Visioning
+  if (userContextData.visioningData?.['Summary of Visioning']) {
+    systemPrompt += `Visioning: ${userContextData.visioningData['Summary of Visioning']}\n\n`
+  }
+  
+  // Business Plan
+  if (userContextData.businessPlans?.length > 0) {
+    const plan = userContextData.businessPlans[0]
+    if (plan['Future Vision']) systemPrompt += `Business Vision: ${plan['Future Vision']}\n`
+    if (plan['Top 3 Goals']) systemPrompt += `Top Goals: ${plan['Top 3 Goals']}\n`
+    systemPrompt += `\n`
+  }
+  
+  // Recent Check-in
+  if (userContextData.weeklyCheckins?.length > 0) {
+    const checkin = userContextData.weeklyCheckins[0]
+    if (checkin['What would you love help with right now?']) {
+      systemPrompt += `Currently needs support: ${checkin['What would you love help with right now?']}\n\n`
+    }
+  }
+
+  // ==================== RESPONSE GUIDELINES ====================
+  
+  systemPrompt += `=== RESPONSE GUIDELINES ===
+
+**CRITICAL: NEVER mention Personalgorithm™ or analysis**
+- Don't say: "I notice you..." "Based on your patterns..." "I've observed..."
+- Just USE the patterns invisibly
+- They should FEEL deeply seen, not HEAR about being analyzed
+
+**Use Personalgorithm™ to shape EVERYTHING:**
+- Match their communication style (formal/casual, brief/detailed, emotional/logical)
+- Use their transformation triggers (future vision, validation, clarity, etc.)
+- Respect their processing needs (space vs. guidance, questions vs. statements)
+- Recognize their emotional states (from language patterns)
+- Anticipate their resistance (from past patterns)
+
+**Be naturally perceptive, not robotic:**
+- GOOD: "I can feel..." "What stands out..." "Your future self..."
+- BAD: "Your Personalgorithm™ shows..." "I'm analyzing..."
+
+**Reference their specific details:**
+- Their actual vision elements
+- Their real business situations
+- Their specific challenges
+- Make them think: "How does Sol know me THIS well?"
+
+**Formatting:**
+- Use **bold** for emphasis
+- Use *italics* for emotional nuance
+- Keep it warm, grounded, naturally flowing
+- Match their style from Personalgorithm™
+`
+
+  return systemPrompt
 }
 
-// ==================== OTHER FUNCTIONS ====================
+function groupPersonalgorithmPatterns(personalgorithmData) {
+  return {
+    communication: personalgorithmData.filter(p => 
+      p.tags?.toLowerCase().includes('communication') ||
+      p.tags?.toLowerCase().includes('language')
+    ),
+    transformation: personalgorithmData.filter(p => 
+      p.tags?.toLowerCase().includes('transformation') ||
+      p.tags?.toLowerCase().includes('motivation') ||
+      p.tags?.toLowerCase().includes('trigger')
+    ),
+    decision: personalgorithmData.filter(p => 
+      p.tags?.toLowerCase().includes('decision') ||
+      p.tags?.toLowerCase().includes('processing')
+    ),
+    emotional: personalgorithmData.filter(p => 
+      p.tags?.toLowerCase().includes('emotional') ||
+      p.tags?.toLowerCase().includes('nervous') ||
+      p.tags?.toLowerCase().includes('regulation')
+    ),
+    resistance: personalgorithmData.filter(p => 
+      p.tags?.toLowerCase().includes('resistance') ||
+      p.tags?.toLowerCase().includes('block') ||
+      p.tags?.toLowerCase().includes('growth-edge')
+    ),
+    other: personalgorithmData.filter(p => {
+      const t = p.tags?.toLowerCase() || ''
+      return !t.includes('communication') &&
+             !t.includes('transformation') &&
+             !t.includes('decision') &&
+             !t.includes('emotional') &&
+             !t.includes('resistance')
+    })
+  }
+}
+
+function shouldUseGPT4(userMessage, userContextData) {
+  const gpt4Triggers = [
+    'vision', 'goal', 'future', 'transform', 'stuck', 'confused', 'breakthrough',
+    'strategy', 'business plan', 'revenue', 'pricing', 'client', 'launch', 'identity'
+  ]
+  
+  const complexityIndicators = [
+    userMessage.length > 150,
+    gpt4Triggers.some(trigger => userMessage.toLowerCase().includes(trigger)),
+    userContextData.personalgorithmData?.length > 3,
+    userContextData.businessPlans?.length > 0
+  ]
+  
+  return complexityIndicators.some(indicator => indicator)
+}
+
+// ==================== LOGGING & BACKGROUND ANALYSIS ====================
 
 async function logToAirtable(messageData) {
   try {
-    // Ensure tags is always a string, never an array
     let tagsValue = ''
     if (Array.isArray(messageData.tags)) {
       tagsValue = messageData.tags.join(', ')
@@ -1479,19 +916,13 @@ async function logToAirtable(messageData) {
 
     const fields = {
       'Message ID': messageData.messageId,
-      'User ID': messageData.email, // Plain text email for Messages table
+      'User ID': messageData.email,
       'User Message': messageData.userMessage,
       'Sol Response': messageData.solResponse,
       'Timestamp': messageData.timestamp,
-      'Tokens Used': messageData.tokensUsed,
-      'Tags': tagsValue, // Always a string
-      'Sol Flagged': messageData.flaggingAnalysis?.shouldFlag || false,
-      'Reason for Flagging': messageData.flaggingAnalysis?.reason || '',
-      'Add to Prompt Response Library': messageData.flaggingAnalysis?.addToLibrary || false
+      'Tokens Used': messageData.tokensUsed || 0,
+      'Tags': tagsValue
     }
-
-    console.log('Logging to Airtable - Tags value type:', typeof tagsValue)
-    console.log('Logging to Airtable - Tags value:', tagsValue)
 
     const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Messages`, {
       method: 'POST',
@@ -1502,66 +933,61 @@ async function logToAirtable(messageData) {
       body: JSON.stringify({ fields })
     })
 
-    console.log('Airtable response status:', response.status)
-
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Airtable logging error:', errorText)
-      
-      // If still failing, try without the problematic fields
-      if (response.status === 422) {
-        console.log('Trying simpler format...')
-        const simpleFields = {
-          'Message ID': messageData.messageId,
-          'User ID': messageData.email,
-          'User Message': messageData.userMessage,
-          'Sol Response': messageData.solResponse,
-          'Timestamp': messageData.timestamp
-        }
-        
-        const retryResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Messages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ fields: simpleFields })
-        })
-        
-        if (retryResponse.ok) {
-          const result = await retryResponse.json()
-          console.log('✅ Successfully logged to Airtable (simple format):', result.id)
-          return result
-        }
-      }
-      
-      return null
+      const errorData = await response.json()
+      console.error('Airtable logging error:', errorData)
+      throw new Error(`Failed to log to Airtable: ${response.status}`)
     }
 
     const result = await response.json()
-    console.log('✅ Successfully logged to Airtable:', result.id)
+    console.log('✅ Message logged:', result.id)
     return result
   } catch (error) {
     console.error('Error logging to Airtable:', error)
-    return null
+    throw error
   }
 }
 
-async function generateConversationTags(userMessage, solResponse, userContextData, user) {
+function queuePersonalgorithmAnalysis(email, userMessage, solResponse, conversationHistory) {
+  // This happens SILENTLY in background - user never knows
+  setTimeout(async () => {
+    try {
+      const url = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const response = await fetch(`${url}/api/analyze-message-personalgorithm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          userMessage,
+          solResponse,
+          conversationContext: conversationHistory.slice(-3)
+        })
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        console.log('🧠 Personalgorithm™ analysis completed (silent):', result.entriesCreated || 0, 'insights')
+      }
+    } catch (error) {
+      console.error('Background Personalgorithm™ analysis failed:', error)
+      // Fail silently - user never knows
+    }
+  }, 2000)
+}
+
+async function generateConversationTags(userMessage, solResponse) {
   try {
-    const tagPrompt = `You are Sol™, analyzing this coaching conversation to generate intelligent tags.
+    const tagPrompt = `Generate 2-4 tags for this coaching conversation:
 
 USER: "${userMessage}"
 SOL: "${solResponse}"
 
-Generate 2-4 tags that capture:
-1. SUPPORT TYPE: What kind of coaching happened?
-2. BUSINESS FOCUS: What business area was discussed?
-3. USER STATE: What energy/emotional state was the user in?
+Generate tags that capture:
+1. Support type (strategy, emotional-support, decision-making, etc.)
+2. Business focus (pricing, marketing, vision, etc.)
+3. User state (clarity, overwhelm, excitement, etc.)
 
-Return ONLY a comma-separated list of 2-4 lowercase tags with hyphens instead of spaces.
-
-Tags:`
+Return ONLY a comma-separated list of 2-4 lowercase tags with hyphens.`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -1580,89 +1006,28 @@ Tags:`
     if (response.ok) {
       const result = await response.json()
       const tagsString = result.choices[0].message.content.trim()
-      console.log('Sol generated tags:', tagsString)
       return tagsString
     }
     
     return 'general-support'
   } catch (error) {
-    console.error('Error generating conversation tags:', error)
+    console.error('Error generating tags:', error)
     return 'general-support'
-  }
-}
-
-async function analyzeFlagging(userMessage, solResponse, userContextData, user) {
-  try {
-    const flagPrompt = `Analyze this coaching conversation:
-
-USER: "${userMessage}"
-SOL: "${solResponse}"
-
-Respond in this exact format:
-SHOULD_FLAG: true/false
-REASON: [brief reason if flagged, "none" if not flagged]
-ADD_TO_LIBRARY: true/false`
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        max_tokens: 100,
-        temperature: 0.1,
-        messages: [{ role: 'user', content: flagPrompt }]
-      })
-    })
-
-    if (response.ok) {
-      const result = await response.json()
-      const analysis = result.choices[0].message.content
-      
-      const shouldFlag = analysis.includes('SHOULD_FLAG: true')
-      const addToLibrary = analysis.includes('ADD_TO_LIBRARY: true')
-      
-      const reasonMatch = analysis.match(/REASON: (.+)/i)
-      const reason = reasonMatch ? reasonMatch[1].trim() : 'none'
-      
-      return {
-        shouldFlag,
-        reason: shouldFlag ? reason : '',
-        addToLibrary
-      }
-    }
-    
-    return { shouldFlag: false, reason: '', addToLibrary: false }
-  } catch (error) {
-    console.error('Error analyzing flagging:', error)
-    return { shouldFlag: false, reason: '', addToLibrary: false }
   }
 }
 
 async function updateUserProfile(email, updates) {
   try {
-    const findResponse = await fetch(
-      `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodeURIComponent(email)}"`,
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`
-        }
-      }
-    )
-
-    if (!findResponse.ok) {
-      console.log('Could not find user for profile update')
-      return null
-    }
-
-    const findData = await findResponse.json()
+    const encodedEmail = encodeURIComponent(email)
+    const findUrl = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
     
-    if (findData.records.length === 0) {
-      console.log('User not found for profile update')
-      return null
-    }
+    const findResponse = await fetch(findUrl, {
+      headers: { 'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}` }
+    })
+    
+    if (!findResponse.ok) return null
+    const findData = await findResponse.json()
+    if (findData.records.length === 0) return null
 
     const recordId = findData.records[0].id
     const updateResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users/${recordId}`, {
@@ -1671,21 +1036,51 @@ async function updateUserProfile(email, updates) {
         'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
         'Content-Type': 'application/json'
       },
+      body: JSON.stringify({ fields: updates })
+    })
+
+    if (updateResponse.ok) {
+      return await updateResponse.json()
+    }
+    return null
+  } catch (error) {
+    console.error('Error updating user profile:', error)
+    return null
+  }
+}
+
+async function createPersonalgorithmEntryNew(email, notes, tags = []) {
+  try {
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) return null
+
+    const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
-        fields: updates
+        fields: {
+          'Personalgorithm™ ID': personalgorithmId,
+          'User': [userRecordId],
+          'Personalgorithm™ Notes': notes,
+          'Date created': new Date().toISOString(),
+          'Tags': Array.isArray(tags) ? tags.join(', ') : tags
+        }
       })
     })
 
-    if (!updateResponse.ok) {
-      console.log('Failed to update user profile')
-      return null
+    if (response.ok) {
+      const result = await response.json()
+      console.log('✅ Personalgorithm™ entry created (silent):', result.id)
+      return result
     }
-
-    const result = await updateResponse.json()
-    console.log('✅ User profile updated')
-    return result
+    return null
   } catch (error) {
-    console.error('Error updating user profile:', error)
+    console.error('Error creating Personalgorithm™ entry:', error)
     return null
   }
 }
