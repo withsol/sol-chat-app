@@ -812,7 +812,8 @@ function shouldUseGPT4(userMessage, userContextData) {
     userContextData.businessPlans?.length > 0
   ]
   
-  return complexityIndicators.some(indicator => indicator)
+ {
+return complexityIndicators.some(indicator => indicator)
 }
 
 // ==================== LOGGING & BACKGROUND ANALYSIS ====================
