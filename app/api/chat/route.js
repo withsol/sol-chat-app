@@ -482,6 +482,11 @@ function queuePersonalgorithmAnalysis(email, userMessage, solResponse, conversat
   setTimeout(async () => {
     try {
       const url = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      
+      console.log('🔍 Attempting Personalgorithm™ analysis...')
+      console.log('URL:', url)
+      console.log('Endpoint:', `${url}/api/analyze-message-personalgorithm`)
+      
       const response = await fetch(`${url}/api/analyze-message-personalgorithm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -493,13 +498,22 @@ function queuePersonalgorithmAnalysis(email, userMessage, solResponse, conversat
         })
       })
       
+      console.log('📡 Response status:', response.status)
+      console.log('📡 Response ok:', response.ok)
+      
       if (response.ok) {
         const result = await response.json()
-        console.log('ðŸ§  Personalgorithmâ„¢ analysis completed:', result.entriesCreated || 0, 'insights')
+        console.log('✅ Personalgorithm™ analysis completed:', result.entriesCreated || 0, 'insights')
+        console.log('Result:', JSON.stringify(result))
+      } else {
+        const errorText = await response.text()
+        console.error('❌ Personalgorithm™ analysis failed with status:', response.status)
+        console.error('Error response:', errorText)
       }
     } catch (error) {
-      console.error('Background Personalgorithmâ„¢ analysis failed:', error)
-      // Fail silently - user never knows
+      console.error('❌ Background Personalgorithm™ analysis failed:', error)
+      console.error('Error message:', error.message)
+      console.error('Error stack:', error.stack)
     }
   }, 2000) // 2 second delay
 }
