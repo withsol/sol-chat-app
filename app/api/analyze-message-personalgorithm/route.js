@@ -204,16 +204,9 @@ function parsePersonalgorithmInsights(analysisText) {
 
 async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated') {
   try {
-    // CRITICAL: Get the User record ID for proper linking
-    const userRecordId = await getUserRecordId(email)
-    if (!userRecordId) {
-      console.error('âŒ Cannot create Personalgorithmâ„¢ entry - user record not found for:', email)
-      return null
-    }
-
     const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
-    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithmâ„¢`, {
+    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
@@ -221,9 +214,9 @@ async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated')
       },
       body: JSON.stringify({
         fields: {
-          'Personalgorithmâ„¢ ID': personalgorithmId,
-          'User': [userRecordId], // âœ… CORRECT: Link to User record, not email string
-          'Personalgorithmâ„¢ Notes': notes,
+          'Personalgorithm™ ID': personalgorithmId,
+          'User ID': email, // ← CORRECT for your system
+          'Personalgorithm™ Notes': notes,
           'Date created': new Date().toISOString(),
           'Tags': typeof tags === 'string' ? tags : tags.join(', ')
         }
@@ -232,48 +225,16 @@ async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated')
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Failed to create Personalgorithmâ„¢ entry:', response.status, errorText)
+      console.error('Failed to create Personalgorithm™ entry:', response.status, errorText)
       return null
     }
 
     const result = await response.json()
-    console.log('âœ… Personalgorithmâ„¢ entry created:', result.id)
+    console.log('✅ Personalgorithm™ entry created:', result.id)
     return result
     
   } catch (error) {
-    console.error('Error creating Personalgorithmâ„¢ entry:', error)
-    return null
-  }
-}
-
-async function getUserRecordId(email) {
-  try {
-    const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      console.error('Failed to fetch user record:', response.status)
-      return null
-    }
-    
-    const data = await response.json()
-    
-    if (data.records.length === 0) {
-      console.error('No user found with email:', email)
-      return null
-    }
-    
-    return data.records[0].id
-
-  } catch (error) {
-    console.error('Error getting user record ID:', error)
+    console.error('Error creating Personalgorithm™ entry:', error)
     return null
   }
 }

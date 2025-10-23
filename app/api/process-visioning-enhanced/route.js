@@ -160,7 +160,7 @@ async function createPersonalgorithmEntry(email, notes, tags = ['auto-generated'
       body: JSON.stringify({
         fields: {
           'Personalgorithm™ ID': personalgorithmId,
-          'User': [userRecordId],
+          'User': email,
           'Personalgorithm™ Notes': notes,
           'Date created': new Date().toISOString(),
           'Tags': Array.isArray(tags) ? tags.join(', ') : tags
