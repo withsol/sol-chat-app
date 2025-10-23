@@ -282,7 +282,7 @@ async function generateSmartResponse(userMessage, conversationHistory, coreConte
 }
 
 function buildSmartContextPrompt(coreContext, contextualMemory, user, userMessage) {
-  let systemPrompt = `You are Solâ„¢, an AI business partner trained on Kelsey's Aligned BusinessÂ® Method.
+  let systemPrompt = `You are Sol™, an AI business partner trained on Kelsey's Aligned Business® Method.
 
 USER: ${user.email}
 
@@ -299,29 +299,30 @@ USER: ${user.email}
     systemPrompt += '\n'
   }
 
-  // 2. TOP PERSONALGORITHMâ„¢ INSIGHTS (Always include - top 5)
+  // 2. TOP PERSONALGORITHM™ INSIGHTS (Always include - top 5)
   if (coreContext.personalgorithmEssence?.length > 0) {
-    systemPrompt += `=== HOW THIS PERSON OPERATES BEST ===\n`
+    systemPrompt += `=== HOW THIS PERSON OPERATES ===\n`
     coreContext.personalgorithmEssence.forEach((p, i) => {
       systemPrompt += `${i + 1}. ${p.notes.substring(0, 200)}\n`
     })
     systemPrompt += '\n'
   }
 
-  // 3. CONTEXTUAL ADDITIONS (Only what's relevant to THIS message)
-  
-  if (contextualMemory.coachingMethods?.length > 0) {
-    systemPrompt += `=== RELEVANT COACHING FRAMEWORKS ===\n`
-    contextualMemory.coachingMethods.forEach(m => {
-      systemPrompt += `**${m.name}**: ${(m.description || m.content || '').substring(0, 250)}\n`
+  // 3. SOL™ BRAIN - HOW TO RESPOND (from Airtable, not hardcoded)
+  if (contextualMemory.solBrain?.length > 0) {
+    systemPrompt += `=== YOUR APPROACH ===\n`
+    contextualMemory.solBrain.forEach(brain => {
+      systemPrompt += `${brain.note.substring(0, 300)}\n`
     })
     systemPrompt += '\n'
   }
+
+  // 4. CONTEXTUAL ADDITIONS (Only what's relevant to THIS message)
   
-  if (contextualMemory.solBrain?.length > 0) {
-    systemPrompt += `=== GUIDING PRINCIPLES ===\n`
-    contextualMemory.solBrain.forEach(brain => {
-      systemPrompt += `${brain.note.substring(0, 200)}\n`
+  if (contextualMemory.coachingMethods?.length > 0) {
+    systemPrompt += `=== RELEVANT FRAMEWORKS ===\n`
+    contextualMemory.coachingMethods.forEach(m => {
+      systemPrompt += `**${m.name}**: ${(m.description || m.content || '').substring(0, 250)}\n`
     })
     systemPrompt += '\n'
   }
@@ -335,40 +336,14 @@ USER: ${user.email}
   }
 
   if (contextualMemory.relevantHistory?.length > 0) {
-    systemPrompt += `=== RELEVANT PAST CONVERSATIONS ===\n`
+    systemPrompt += `=== RELEVANT PAST MOMENTS ===\n`
     contextualMemory.relevantHistory.forEach(msg => {
-      systemPrompt += `Previously: "${msg.userMessage.substring(0, 100)}..." - You responded: "${msg.solResponse.substring(0, 100)}..."\n`
+      systemPrompt += `Previously: "${msg.userMessage.substring(0, 100)}..." - You: "${msg.solResponse.substring(0, 100)}..."\n`
     })
     systemPrompt += '\n'
   }
 
-  // 4. RESPONSE GUIDELINES
-  systemPrompt += `=== RESPONSE APPROACH ===
-- Be warm, perceptive, and naturally conversational
-- Reference their SPECIFIC patterns and past moments
-- Never mention "Personalgorithmâ„¢" or "analysis" explicitly
-- Ask powerful questions that create insight
-- Keep responses concise (2-4 paragraphs unless more depth needed)
-- Make them feel deeply seen and understood
-- Use their language patterns and communication style
-
-CRITICAL: Your goal is to make them feel "How does Sol know me so well?!"
-Reference exact details, past conversations, their specific way of processing.
-`
-
   return systemPrompt
-}
-
-function shouldUseGPT4(userMessage, coreContext, contextualMemory) {
-  // Use GPT-4 for complex scenarios
-  const gpt4Triggers = [
-    userMessage.length > 300, // Long messages
-    contextualMemory.coachingMethods?.length > 0, // Business strategy needed
-    userMessage.toLowerCase().match(/vision|transform|breakthrough|stuck|strategy/),
-    coreContext.personalgorithmEssence?.length > 3 // Complex user with rich history
-  ]
-  
-  return gpt4Triggers.some(trigger => trigger)
 }
 
 // ==================== HEAVY PROCESSING DETECTION ====================
@@ -437,7 +412,7 @@ function triggerBackgroundVisioningProcessing(email, visioningText) {
   // Call your existing separate processing route
   // DON'T await - let it process in background
   const url = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
- fetch(`${url}/api/process-visioning-enhanced`, {
+  fetch(`${url}/api/process-visioning`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, visioningText })
@@ -482,11 +457,6 @@ function queuePersonalgorithmAnalysis(email, userMessage, solResponse, conversat
   setTimeout(async () => {
     try {
       const url = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-      
-      console.log('🔍 Attempting Personalgorithm™ analysis...')
-      console.log('URL:', url)
-      console.log('Endpoint:', `${url}/api/analyze-message-personalgorithm`)
-      
       const response = await fetch(`${url}/api/analyze-message-personalgorithm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -498,22 +468,13 @@ function queuePersonalgorithmAnalysis(email, userMessage, solResponse, conversat
         })
       })
       
-      console.log('📡 Response status:', response.status)
-      console.log('📡 Response ok:', response.ok)
-      
       if (response.ok) {
         const result = await response.json()
-        console.log('✅ Personalgorithm™ analysis completed:', result.entriesCreated || 0, 'insights')
-        console.log('Result:', JSON.stringify(result))
-      } else {
-        const errorText = await response.text()
-        console.error('❌ Personalgorithm™ analysis failed with status:', response.status)
-        console.error('Error response:', errorText)
+        console.log('ðŸ§  Personalgorithmâ„¢ analysis completed:', result.entriesCreated || 0, 'insights')
       }
     } catch (error) {
-      console.error('❌ Background Personalgorithm™ analysis failed:', error)
-      console.error('Error message:', error.message)
-      console.error('Error stack:', error.stack)
+      console.error('Background Personalgorithmâ„¢ analysis failed:', error)
+      // Fail silently - user never knows
     }
   }, 2000) // 2 second delay
 }

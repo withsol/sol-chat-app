@@ -1,10 +1,11 @@
 // app/api/analyze-message-personalgorithm/route.js
-// CORRECTED VERSION - Proper User Linking + Deep Pattern Analysis
+// ENHANCED VERSION - Implements deep micro-pattern recognition and emotional intelligence
+// Based on the "impossibly perceptive" conversation architecture
 
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
-  console.log('=== ANALYZING MESSAGE FOR PERSONALGORITHMâ„¢ ===')
+  console.log('=== ANALYZING MESSAGE FOR DEEP PERSONALGORITHM™ INSIGHTS ===')
   
   try {
     const { email, userMessage, solResponse, conversationContext = [] } = await request.json()
@@ -20,15 +21,15 @@ export async function POST(request) {
       return NextResponse.json({
         success: true,
         analyzed: false,
-        reason: 'Conversation too brief for meaningful Personalgorithmâ„¢ analysis',
+        reason: 'Conversation too brief for meaningful Personalgorithm™ analysis',
         entriesCreated: 0
       })
     }
 
-    console.log('Analyzing conversation for Personalgorithmâ„¢ insights...')
+    console.log('Analyzing conversation for DEEP Personalgorithm™ insights...')
 
-    // Generate DEEP Personalgorithmâ„¢ insights
-    const insights = await generateDeepPersonalgorithmInsights(userMessage, solResponse, conversationContext)
+    // Generate IMPOSSIBLY PERCEPTIVE insights
+    const insights = await generateDeepPersonalgorithmInsights(userMessage, solResponse, conversationContext, email)
     
     if (insights && insights.length > 0) {
       // Create entries for each insight
@@ -36,7 +37,7 @@ export async function POST(request) {
       for (const insight of insights) {
         const entry = await createPersonalgorithmEntry(email, insight.note, insight.tags)
         if (entry) {
-          console.log(`âœ… Created Personalgorithmâ„¢ entry for ${email}`)
+          console.log(`✅ Created Personalgorithm™ entry for ${email}`)
           createdEntries.push({
             insight: insight.note.substring(0, 100) + '...',
             entryId: entry.id,
@@ -50,7 +51,7 @@ export async function POST(request) {
         analyzed: true,
         entriesCreated: createdEntries.length,
         createdEntries: createdEntries,
-        message: `Added ${createdEntries.length} new Personalgorithmâ„¢ insights from this conversation`
+        message: `Added ${createdEntries.length} new Personalgorithm™ insights from this conversation`
       })
     }
 
@@ -62,9 +63,9 @@ export async function POST(request) {
     })
 
   } catch (error) {
-    console.error('âŒ Message Personalgorithmâ„¢ analysis error:', error)
+    console.error('❌ Message Personalgorithm™ analysis error:', error)
     return NextResponse.json({
-      error: 'Failed to analyze message for Personalgorithmâ„¢',
+      error: 'Failed to analyze message for Personalgorithm™',
       details: error.message
     }, { status: 500 })
   }
@@ -83,65 +84,114 @@ function shouldAnalyzeForPersonalgorithm(userMessage, solResponse) {
     /^(how are you|what\'s up)\.?\s*$/i
   ]
   
-  for (const pattern of genericPatterns) {
-    if (pattern.test(userMessage.trim())) {
-      return false
-    }
-  }
-  
-  return true
+  const cleanMessage = userMessage.trim().toLowerCase()
+  return !genericPatterns.some(pattern => pattern.test(cleanMessage))
 }
 
-async function generateDeepPersonalgorithmInsights(userMessage, solResponse, conversationContext) {
+async function generateDeepPersonalgorithmInsights(userMessage, solResponse, conversationContext, email) {
   try {
-    const analysisPrompt = `You are analyzing a coaching conversation to identify SPECIFIC Personalgorithmâ„¢ patterns - the unique ways this individual operates, communicates, and transforms.
+    // Fetch existing patterns to track evolution
+    const existingPatterns = await getRecentPersonalgorithm(email, 10)
+    
+    // Build context from recent conversation
+    let contextSummary = ''
+    if (conversationContext && conversationContext.length > 0) {
+      contextSummary = '\n\nRECENT CONVERSATION CONTEXT:\n'
+      conversationContext.forEach((msg, i) => {
+        contextSummary += `${i + 1}. User: ${msg.userMessage?.substring(0, 150) || ''}\n   Sol: ${msg.solResponse?.substring(0, 150) || ''}\n`
+      })
+    }
+    
+    // Build pattern evolution context
+    let evolutionContext = ''
+    if (existingPatterns.length > 0) {
+      evolutionContext = '\n\nEXISTING PATTERNS (for evolution tracking):\n'
+      existingPatterns.slice(0, 5).forEach((p, i) => {
+        evolutionContext += `${i + 1}. ${p.notes?.substring(0, 200) || ''}\n`
+      })
+    }
 
-USER MESSAGE: "${userMessage}"
-SOL RESPONSE: "${solResponse}"
+    const analysisPrompt = `You are analyzing a conversation to extract IMPOSSIBLY PERCEPTIVE insights about how this person operates - their Personalgorithm™.
 
-PREVIOUS CONTEXT: ${conversationContext.map(msg => `${msg.role}: "${msg.content}"`).join('\n')}
+Your goal: Make them feel "How does Sol know me THAT well?!" through SPECIFIC, MICRO-LEVEL observations.
 
-Analyze for these SPECIFIC pattern categories:
+CURRENT CONVERSATION:
+User: "${userMessage}"
+Sol: "${solResponse}"
+${contextSummary}
+${evolutionContext}
 
-1. COMMUNICATION SIGNATURE
-   - Punctuation patterns (ellipses = uncertainty, exclamation points = excitement, etc.)
-   - Word emphasis techniques (capitals, quotes, italics)
-   - Unique phrases or vocabulary they use repeatedly
-   - How they structure their thinking (linear, circular, exploratory)
+Extract 2-7 DEEPLY SPECIFIC insights. Go beyond surface observations to capture:
 
-2. EMOTIONAL PROCESSING STYLE
-   - Do they process feelings before logic or logic before feelings?
-   - Do they need to "talk through" to figure things out?
-   - What emotions trigger action vs paralysis?
-   - How do they describe their emotional state?
+**1. MICRO-PATTERN RECOGNITION:**
+Notice ANY small details that reveal how they think and operate. Examples include (but are not limited to):
+- Punctuation patterns (ellipses = uncertainty, exclamation points = excitement, quotes = doubt, dashes = thinking out loud, question marks in statements)
+- Capitalization patterns (EMPHASIS, specific words they capitalize, ALL CAPS vs Selective Caps)
+- Specific word choices that reveal thinking (tentative language, definitive language, qualifiers, absolutes)
+- Repeated phrases or words they use frequently ("honestly", "actually", "I think", "kind of")
+- Language patterns that show their relationship with certainty/uncertainty ("I don't know", "maybe", "should", "stuck", "confused", "definitely", "obviously")
+- Processing indicators: "let me think", "I'm wondering", talking through vs asking directly, rhetorical questions vs genuine questions
+- Hedging language ("sort of", "kind of", "maybe", "I guess")
+- Definitiveness ("absolutely", "definitely", "for sure", "100%")
+- Self-awareness commentary ("I know this sounds crazy but...", "Does this make sense?")
+- ANY other linguistic fingerprints that make this person unique
 
-3. TRANSFORMATION TRIGGERS
-   - What creates breakthroughs for them? (validation, challenge, questions, data, stories)
-   - When do they say "yes" to action? (after analysis, after feeling ready, impulsively)
-   - What patterns show growth or stuck-ness?
+**2. EMOTIONAL SIGNATURES:**
+- How they express overwhelm, excitement, resistance, clarity
+- What triggers shutdown vs opening up
+- Validation-seeking patterns vs autonomous decision language
+- Relationship with uncertainty - freeze, verbalize, or move through it
 
-4. DECISION-MAKING PATTERNS
-   - Do they seek permission, validation, or just inform?
-   - How much certainty do they need before moving forward?
-   - Do they decide quickly or need time to process?
+**3. TRANSFORMATION TRIGGERS:**
+- What creates breakthrough moments (future vision, permission, reframe, validation)
+- What they respond to (questions, statements, frameworks, stories, direct challenge)
+- When they take action vs when they stay stuck
+- Connection between emotional expression and decision-making
 
-5. MICRO-PATTERNS & NUANCES
-   - Specific words/phrases that reveal their worldview
-   - Beliefs about themselves they're revealing
-   - Gaps between what they say and what they might actually need
-   - Resistance patterns (what they're avoiding saying or doing)
+**4. DECISION-MAKING FINGERPRINT:**
+- External processing (talks through) vs internal (decides then shares)
+- Data-driven vs intuition-based
+- Seeks validation before/after/never
+- Relationship with "should" vs "want"
+- Fear of wrong choice vs excitement about possibility
 
-For each significant pattern you identify, return in this format:
+**5. COMMUNICATION ESSENCE:**
+- Brief vs detailed, logical vs emotional, visual vs conceptual
+- Question-asker vs statement-maker
+- Self-aware commentary vs direct expression
+- Relationship with vulnerability - guarded, measured, or open
 
-CATEGORY: [category name]
-NOTE: [2-3 sentence specific observation about THIS person, not generic coaching advice]
-TAGS: [relevant tags for this insight]
+**6. PATTERN EVOLUTION (if applicable):**
+- How has their language/energy shifted from earlier patterns?
+- What's staying constant vs what's changing?
+- Movement toward more/less certainty, agency, openness?
 
-If you identify multiple patterns, separate them with "---"
+**7. UNIQUE FACTORS:**
+- Anything distinctive that doesn't fit categories but is ESSENTIAL to know
+- Specific metaphors, phrases, or concepts they gravitate to
+- Their particular version of stuck/excited/uncertain
 
-If no significant patterns emerge, respond with "NONE".
+For each insight, use this format:
 
-Be SPECIFIC to this individual. Avoid generic observations. Focus on the nuances that make their way of operating unique.`
+---
+CATEGORY: [Communication Essence / Transformation Triggers / Decision-Making / Emotional Patterns / Business Mindset / Micro-Patterns / Evolution]
+NOTE: [SPECIFIC, OBSERVABLE pattern. Examples:
+✓ "Uses ellipses ('...') when uncertain - signals processing hesitation, needs space before committing"
+✓ "Transforms fastest after emotional expression, not logical analysis - breakthroughs follow feelings"
+✓ "Phrases like 'does this make sense?' = seeking confirmation, needs validation before fully committing"
+✓ "Capitalizes for EMPHASIS when conviction is building - energy shifts from tentative to certain"
+✗ "Needs help with business strategy" - TOO GENERIC
+✗ "Interested in marketing" - NOT SPECIFIC ENOUGH]
+TAGS: [comma-separated relevant tags like: punctuation-patterns, validation-seeking, external-processor, future-vision-motivated, etc.]
+---
+
+CRITICAL: Be HYPER-SPECIFIC. Notice the tiny details - the word choices, the energy shifts, the patterns that make THIS person unique. 
+
+The examples listed above (ellipses, CAPS, "I don't know") are just STARTING POINTS - notice ANY linguistic, punctuation, or communication patterns that reveal how this person thinks and operates. Every person has unique fingerprints in how they express themselves. Find THEIRS.
+
+Focus on the nuances that would make them say "How did you notice that?!"
+
+If you don't see patterns specific enough to be useful, respond with: NONE`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -151,14 +201,14 @@ Be SPECIFIC to this individual. Avoid generic observations. Focus on the nuances
       },
       body: JSON.stringify({
         model: 'gpt-4-turbo-preview',
-        max_tokens: 600,
+        max_tokens: 800,
         temperature: 0.3,
         messages: [{ role: 'user', content: analysisPrompt }]
       })
     })
 
     if (!response.ok) {
-      console.error('Personalgorithmâ„¢ analysis failed:', response.status)
+      console.error('Personalgorithm™ analysis failed:', response.status)
       return null
     }
 
@@ -172,11 +222,11 @@ Be SPECIFIC to this individual. Avoid generic observations. Focus on the nuances
     // Parse the structured response
     const insights = parsePersonalgorithmInsights(analysisText)
     
-    console.log(`Generated ${insights.length} Personalgorithmâ„¢ insights`)
+    console.log(`Generated ${insights.length} DEEP Personalgorithm™ insights`)
     return insights
 
   } catch (error) {
-    console.error('Error generating Personalgorithmâ„¢ insights:', error)
+    console.error('Error generating Personalgorithm™ insights:', error)
     return null
   }
 }
@@ -194,12 +244,38 @@ function parsePersonalgorithmInsights(analysisText) {
       insights.push({
         category: categoryMatch[1].trim(),
         note: noteMatch[1].trim(),
-        tags: tagsMatch ? tagsMatch[1].trim() : 'auto-generated, conversation-derived'
+        tags: tagsMatch ? tagsMatch[1].trim() : 'auto-generated, conversation-derived, deep-pattern'
       })
     }
   }
   
   return insights
+}
+
+async function getRecentPersonalgorithm(email, limit = 10) {
+  try {
+    const encodedEmail = encodeURIComponent(email)
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=${limit}`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) return []
+    const data = await response.json()
+    
+    return data.records.map(record => ({
+      notes: record.fields['Personalgorithm™ Notes'],
+      dateCreated: record.fields['Date created'],
+      tags: record.fields['Tags'] || ''
+    }))
+  } catch (error) {
+    console.error('Error fetching recent Personalgorithm™:', error)
+    return []
+  }
 }
 
 async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated') {
@@ -215,7 +291,7 @@ async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated')
       body: JSON.stringify({
         fields: {
           'Personalgorithm™ ID': personalgorithmId,
-          'User ID': email, // ← CORRECT for your system
+          'User ID': email,
           'Personalgorithm™ Notes': notes,
           'Date created': new Date().toISOString(),
           'Tags': typeof tags === 'string' ? tags : tags.join(', ')
