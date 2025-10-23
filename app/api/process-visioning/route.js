@@ -1,5 +1,5 @@
 // app/api/process-visioning/route.js
-// FULLY FIXED VERSION - Both Personalgorithm™ AND Visioning use record IDs
+// WORKING VERSION - Removed computed field issue
 
 import { NextResponse } from 'next/server'
 
@@ -22,7 +22,7 @@ export async function POST(request) {
     console.log('Processing visioning for user:', email)
     console.log('Visioning text length:', visioningText.length, 'characters')
 
-    // CRITICAL: Get user record ID FIRST
+    // Get user record ID
     const userRecordId = await getUserRecordId(email)
     if (!userRecordId) {
       console.error('❌ User record not found for:', email)
@@ -33,38 +33,34 @@ export async function POST(request) {
     }
     console.log('✅ User record ID found:', userRecordId)
 
-    // SPLIT INTO SECTIONS (process separately to avoid token limits)
+    // Parse and analyze sections
     const sections = parseVisioningSections(visioningText)
     console.log('Sections found:', sections.map(s => s.title).join(', '))
     console.log(`Parsed into ${sections.length} sections`)
 
-    // ANALYZE EACH SECTION SEPARATELY (smaller chunks = no token limit errors)
     const sectionAnalyses = []
     for (const section of sections) {
-      if (section.content.length > 100) { // Only process substantial sections
+      if (section.content.length > 100) {
         console.log(`Analyzing section: ${section.title}`)
         const analysis = await analyzeVisioningSection(section.title, section.content)
         sectionAnalyses.push(analysis)
-        
-        // Small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 500))
       }
     }
 
-    // COMBINE ANALYSES INTO COMPREHENSIVE SUMMARY
+    // Synthesize
     const comprehensiveAnalysis = await synthesizeVisioningAnalysis(sectionAnalyses, email)
     console.log('Synthesis complete')
 
-    // CREATE VISIONING ENTRY IN AIRTABLE - FIXED to use userRecordId
+    // Create entries
     await createVisioningEntry(userRecordId, visioningText, comprehensiveAnalysis)
     console.log('✅ Visioning entry created')
 
-    // UPDATE USER PROFILE
     await updateUserProfileFromVisioning(email, comprehensiveAnalysis)
     console.log('✅ Profile updated with vision')
     console.log('✅ User profile updated')
 
-    // CREATE PERSONALGORITHM™ ENTRIES - uses userRecordId
+    // Create Personalgorithm entries
     if (comprehensiveAnalysis.personalgorithmInsights?.length > 0) {
       for (const insight of comprehensiveAnalysis.personalgorithmInsights.slice(0, 8)) {
         await createPersonalgorithmEntry(userRecordId, insight, 'visioning-derived, intake')
@@ -90,32 +86,17 @@ export async function POST(request) {
   }
 }
 
-// ==================== PARSE VISIONING INTO SECTIONS ====================
-
 function parseVisioningSections(visioningText) {
   const sections = []
   
-  // Common section markers
   const sectionMarkers = [
-    'section one',
-    'section two', 
-    'section three',
-    'section 1',
-    'section 2',
-    'section 3',
-    'basic brand analysis',
-    'audience analysis',
-    'competitive analysis',
-    'free write',
-    'current reality',
-    'mission statement',
-    'core values',
-    '1 year',
-    '3 year',
-    '7 year'
+    'section one', 'section two', 'section three',
+    'section 1', 'section 2', 'section 3',
+    'basic brand analysis', 'audience analysis', 'competitive analysis',
+    'free write', 'current reality', 'mission statement', 'core values',
+    '1 year', '3 year', '7 year'
   ]
 
-  // Split by common section patterns
   let currentSection = { title: 'Introduction', content: '' }
   const lines = visioningText.split('\n')
   
@@ -123,27 +104,22 @@ function parseVisioningSections(visioningText) {
     const line = lines[i].trim()
     const lineLower = line.toLowerCase()
     
-    // Check if this line is a section header
     const isSectionHeader = sectionMarkers.some(marker => 
       lineLower.includes(marker) && line.length < 150
     )
     
     if (isSectionHeader && currentSection.content.length > 50) {
-      // Save previous section
       sections.push({ ...currentSection })
-      // Start new section
       currentSection = { title: line, content: '' }
     } else {
       currentSection.content += line + '\n'
     }
   }
   
-  // Add final section
   if (currentSection.content.length > 50) {
     sections.push(currentSection)
   }
   
-  // If no sections found, treat entire text as one section
   if (sections.length === 0) {
     sections.push({
       title: 'Complete Visioning',
@@ -155,11 +131,8 @@ function parseVisioningSections(visioningText) {
   return sections
 }
 
-// ==================== ANALYZE INDIVIDUAL SECTION ====================
-
 async function analyzeVisioningSection(sectionTitle, sectionContent) {
   try {
-    // Keep prompt focused and short
     const prompt = `Analyze this visioning section and extract key insights:
 
 SECTION: ${sectionTitle}
@@ -212,8 +185,6 @@ Be concise. Focus on what will help personalize coaching.`
   }
 }
 
-// ==================== SYNTHESIZE ALL SECTIONS ====================
-
 async function synthesizeVisioningAnalysis(sectionAnalyses, email) {
   try {
     const analysisText = sectionAnalyses.map(a => 
@@ -265,7 +236,6 @@ Respond in JSON format:
     const data = await response.json()
     const synthesis = JSON.parse(data.choices[0].message.content)
     
-    // Ensure we have personalgorithm insights
     if (!synthesis.personalgorithmInsights || synthesis.personalgorithmInsights.length === 0) {
       synthesis.personalgorithmInsights = [
         'Completed comprehensive visioning homework, demonstrating commitment to structured planning',
@@ -287,12 +257,6 @@ Respond in JSON format:
   }
 }
 
-// ==================== AIRTABLE HELPER FUNCTIONS ====================
-
-/**
- * CRITICAL: Get Airtable record ID for user
- * Required for linked record fields
- */
 async function getUserRecordId(email) {
   try {
     const encodedEmail = encodeURIComponent(email)
@@ -317,7 +281,7 @@ async function getUserRecordId(email) {
       return null
     }
 
-    return data.records[0].id // This is the record ID we need!
+    return data.records[0].id
   } catch (error) {
     console.error('Error getting user record ID:', error)
     return null
@@ -375,9 +339,7 @@ async function updateUserProfile(email, updates) {
   }
 }
 
-/**
- * FIXED: Use 'User ID' field name with record ID array for Personalgorithm™
- */
+// ✅ FIXED: Removed 'Date created' - it's a computed field in Airtable
 async function createPersonalgorithmEntry(userRecordId, notes, tags) {
   try {
     const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -388,9 +350,9 @@ async function createPersonalgorithmEntry(userRecordId, notes, tags) {
       records: [{
         fields: {
           'Personalgorithm™ ID': personalgorithmId,
-          'User ID': [userRecordId], // ✅ Correct field name with record ID array
+          'User ID': [userRecordId],
           'Personalgorithm™ Notes': notes,
-          'Date created': new Date().toISOString(),
+          // ✅ REMOVED: 'Date created' - Airtable sets this automatically
           'Tags': tags,
           'Attachments': [],
           'Attachment Summary': ''
@@ -425,9 +387,6 @@ async function createPersonalgorithmEntry(userRecordId, notes, tags) {
   }
 }
 
-/**
- * FIXED: Visioning table also uses User ID as linked record!
- */
 async function createVisioningEntry(userRecordId, visioningText, synthesis) {
   try {
     const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Visioning`
@@ -438,10 +397,10 @@ async function createVisioningEntry(userRecordId, visioningText, synthesis) {
       records: [{
         fields: {
           'Visioning ID': visioningId,
-          'User ID': [userRecordId], // ✅ FIXED: Use record ID array, not email string
+          'User ID': [userRecordId],
           'Date of Submission': new Date().toISOString(),
           'Summary of Visioning': synthesis.summary || 'Comprehensive visioning completed',
-          'Visioning Homework - Text Format': visioningText.substring(0, 100000), // Airtable limit
+          'Visioning Homework - Text Format': visioningText.substring(0, 100000),
           'Tags': synthesis.keyThemes || 'visioning-comprehensive',
           'Notes': 'Processed via automated visioning analysis'
         }
@@ -483,7 +442,6 @@ async function updateUserProfileFromVisioning(email, synthesis) {
       'Tags': synthesis.keyThemes || ''
     }
     
-    // Get existing profile to merge tags
     const existingProfile = await getUserProfile(email)
     if (existingProfile && existingProfile['Tags']) {
       const existingTags = existingProfile['Tags'].split(',').map(t => t.trim())
