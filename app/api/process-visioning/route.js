@@ -1,5 +1,5 @@
 // app/api/process-visioning/route.js
-// FIXED VERSION - Properly creates Personalgorithm™ entries with correct field names
+// FULLY FIXED VERSION - Both Personalgorithm™ AND Visioning use record IDs
 
 import { NextResponse } from 'next/server'
 
@@ -55,8 +55,8 @@ export async function POST(request) {
     const comprehensiveAnalysis = await synthesizeVisioningAnalysis(sectionAnalyses, email)
     console.log('Synthesis complete')
 
-    // CREATE VISIONING ENTRY IN AIRTABLE
-    await createVisioningEntry(email, visioningText, comprehensiveAnalysis)
+    // CREATE VISIONING ENTRY IN AIRTABLE - FIXED to use userRecordId
+    await createVisioningEntry(userRecordId, visioningText, comprehensiveAnalysis)
     console.log('✅ Visioning entry created')
 
     // UPDATE USER PROFILE
@@ -64,7 +64,7 @@ export async function POST(request) {
     console.log('✅ Profile updated with vision')
     console.log('✅ User profile updated')
 
-    // CREATE PERSONALGORITHM™ ENTRIES - FIXED to use userRecordId
+    // CREATE PERSONALGORITHM™ ENTRIES - uses userRecordId
     if (comprehensiveAnalysis.personalgorithmInsights?.length > 0) {
       for (const insight of comprehensiveAnalysis.personalgorithmInsights.slice(0, 8)) {
         await createPersonalgorithmEntry(userRecordId, insight, 'visioning-derived, intake')
@@ -290,7 +290,7 @@ Respond in JSON format:
 // ==================== AIRTABLE HELPER FUNCTIONS ====================
 
 /**
- * CRITICAL FIX: Get Airtable record ID for user
+ * CRITICAL: Get Airtable record ID for user
  * Required for linked record fields
  */
 async function getUserRecordId(email) {
@@ -376,7 +376,7 @@ async function updateUserProfile(email, updates) {
 }
 
 /**
- * CRITICAL FIX: Use 'User ID' field name with record ID array
+ * FIXED: Use 'User ID' field name with record ID array for Personalgorithm™
  */
 async function createPersonalgorithmEntry(userRecordId, notes, tags) {
   try {
@@ -388,7 +388,7 @@ async function createPersonalgorithmEntry(userRecordId, notes, tags) {
       records: [{
         fields: {
           'Personalgorithm™ ID': personalgorithmId,
-          'User ID': [userRecordId], // ✅ FIXED: Correct field name with record ID array
+          'User ID': [userRecordId], // ✅ Correct field name with record ID array
           'Personalgorithm™ Notes': notes,
           'Date created': new Date().toISOString(),
           'Tags': tags,
@@ -425,31 +425,38 @@ async function createPersonalgorithmEntry(userRecordId, notes, tags) {
   }
 }
 
-async function createVisioningEntry(email, visioningText, synthesis) {
+/**
+ * FIXED: Visioning table also uses User ID as linked record!
+ */
+async function createVisioningEntry(userRecordId, visioningText, synthesis) {
   try {
     const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Visioning`
     
     const visioningId = `v_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
+    const payload = {
+      records: [{
+        fields: {
+          'Visioning ID': visioningId,
+          'User ID': [userRecordId], // ✅ FIXED: Use record ID array, not email string
+          'Date of Submission': new Date().toISOString(),
+          'Summary of Visioning': synthesis.summary || 'Comprehensive visioning completed',
+          'Visioning Homework - Text Format': visioningText.substring(0, 100000), // Airtable limit
+          'Tags': synthesis.keyThemes || 'visioning-comprehensive',
+          'Notes': 'Processed via automated visioning analysis'
+        }
+      }]
+    }
+
+    console.log('Creating Visioning entry...')
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        records: [{
-          fields: {
-            'Visioning ID': visioningId,
-            'User ID': email,
-            'Date of Submission': new Date().toISOString(),
-            'Summary of Visioning': synthesis.summary || 'Comprehensive visioning completed',
-            'Visioning Homework - Text Format': visioningText.substring(0, 100000), // Airtable limit
-            'Tags': synthesis.keyThemes || 'visioning-comprehensive',
-            'Notes': 'Processed via automated visioning analysis'
-          }
-        }]
-      })
+      body: JSON.stringify(payload)
     })
 
     if (!response.ok) {
@@ -458,7 +465,10 @@ async function createVisioningEntry(email, visioningText, synthesis) {
       throw new Error('Failed to create visioning entry')
     }
 
-    return await response.json()
+    const result = await response.json()
+    console.log('Visioning entry created successfully:', result.records[0].id)
+    return result.records[0]
+
   } catch (error) {
     console.error('Error creating visioning entry:', error)
     throw error
