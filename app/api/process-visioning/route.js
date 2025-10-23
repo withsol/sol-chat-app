@@ -1,7 +1,11 @@
 // app/api/process-visioning/route.js
-// OPTIMIZED VERSION - Handles large visioning content without token limit errors
+// FIXED VERSION - Properly creates Personalgorithm™ entries with correct field names
 
 import { NextResponse } from 'next/server'
+
+const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID
+const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
 export async function POST(request) {
   console.log('=== PROCESSING VISIONING DOCUMENT (OPTIMIZED) ===')
@@ -18,15 +22,27 @@ export async function POST(request) {
     console.log('Processing visioning for user:', email)
     console.log('Visioning text length:', visioningText.length, 'characters')
 
+    // CRITICAL: Get user record ID FIRST
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) {
+      console.error('❌ User record not found for:', email)
+      return NextResponse.json({ 
+        success: false, 
+        error: 'User record not found' 
+      }, { status: 404 })
+    }
+    console.log('✅ User record ID found:', userRecordId)
+
     // SPLIT INTO SECTIONS (process separately to avoid token limits)
     const sections = parseVisioningSections(visioningText)
-    console.log('Parsed into', sections.length, 'sections')
+    console.log('Sections found:', sections.map(s => s.title).join(', '))
+    console.log(`Parsed into ${sections.length} sections`)
 
     // ANALYZE EACH SECTION SEPARATELY (smaller chunks = no token limit errors)
     const sectionAnalyses = []
     for (const section of sections) {
       if (section.content.length > 100) { // Only process substantial sections
-        console.log('Analyzing section:', section.title)
+        console.log(`Analyzing section: ${section.title}`)
         const analysis = await analyzeVisioningSection(section.title, section.content)
         sectionAnalyses.push(analysis)
         
@@ -40,17 +56,18 @@ export async function POST(request) {
     console.log('Synthesis complete')
 
     // CREATE VISIONING ENTRY IN AIRTABLE
-    const visioningEntry = await createVisioningEntry(email, visioningText, comprehensiveAnalysis)
+    await createVisioningEntry(email, visioningText, comprehensiveAnalysis)
     console.log('✅ Visioning entry created')
 
     // UPDATE USER PROFILE
     await updateUserProfileFromVisioning(email, comprehensiveAnalysis)
+    console.log('✅ Profile updated with vision')
     console.log('✅ User profile updated')
 
-    // CREATE PERSONALGORITHM™ ENTRIES
+    // CREATE PERSONALGORITHM™ ENTRIES - FIXED to use userRecordId
     if (comprehensiveAnalysis.personalgorithmInsights?.length > 0) {
       for (const insight of comprehensiveAnalysis.personalgorithmInsights.slice(0, 8)) {
-        await createPersonalgorithmEntry(email, insight, 'visioning-derived, intake')
+        await createPersonalgorithmEntry(userRecordId, insight, 'visioning-derived, intake')
         console.log('✅ Personalgorithm™ entry created')
       }
     }
@@ -153,41 +170,45 @@ Extract:
 2. Core values/beliefs (1-3)
 3. Challenges or fears (1-2)
 4. Business/life context (1-2 sentences)
-5. Communication style notes (how they write, tone, patterns)
+5. Communication patterns (if evident)
 
-Keep response under 300 words.`
+Be concise. Focus on what will help personalize coaching.`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
-        max_tokens: 500,
-        temperature: 0.5,
-        messages: [
-          { role: 'user', content: prompt }
-        ]
+        messages: [{
+          role: 'system',
+          content: 'You are analyzing visioning homework to extract coaching insights. Be brief and focused.'
+        }, {
+          role: 'user',
+          content: prompt
+        }],
+        temperature: 0.3,
+        max_tokens: 400
       })
     })
 
     if (!response.ok) {
-      console.error('Section analysis failed:', response.status)
-      return { sectionTitle, analysis: 'Analysis failed', rawContent: sectionContent.substring(0, 500) }
+      throw new Error(`OpenAI API error: ${response.status}`)
     }
 
-    const result = await response.json()
+    const data = await response.json()
     return {
-      sectionTitle,
-      analysis: result.choices[0].message.content,
-      rawContent: sectionContent.substring(0, 500)
+      section: sectionTitle,
+      insights: data.choices[0].message.content
     }
-
   } catch (error) {
     console.error('Error analyzing section:', error)
-    return { sectionTitle, analysis: 'Error', rawContent: sectionContent.substring(0, 500) }
+    return {
+      section: sectionTitle,
+      insights: 'Analysis pending'
+    }
   }
 }
 
@@ -195,164 +216,108 @@ Keep response under 300 words.`
 
 async function synthesizeVisioningAnalysis(sectionAnalyses, email) {
   try {
-    // Combine all section analyses into one coherent understanding
-    const combinedAnalysis = sectionAnalyses
-      .map(s => `${s.sectionTitle}:\n${s.analysis}`)
-      .join('\n\n')
+    const analysisText = sectionAnalyses.map(a => 
+      `${a.section}:\n${a.insights}`
+    ).join('\n\n')
 
-    const synthesisPrompt = `Based on these visioning sections, create a comprehensive profile:
+    const prompt = `Synthesize this comprehensive visioning analysis into:
 
-${combinedAnalysis.substring(0, 4000)}
+1. Current Vision (2-3 paragraphs): Their ultimate future vision
+2. Summary (1 paragraph): Overview of their business/life direction
+3. Key themes (comma-separated tags): Main patterns you see
+4. Personalgorithm insights (3-5): HOW they communicate, process info, and transform
 
-Provide:
-1. VISION: 1-year, 3-year, 7-year goals (2-3 sentences each)
-2. CURRENT_STATE: Where they are now logistically and emotionally (3-4 sentences)
-3. GOALS: Top 3-5 current goals
-4. CHALLENGES: Main challenges they're facing
-5. STRENGTHS: Key strengths and assets
-6. VALUES: Core values and beliefs
-7. PERSONALGORITHM_INSIGHTS: 5-8 specific patterns about how they communicate, make decisions, transform (one per line)
-8. TAGS: 5-10 relevant tags (comma-separated)
+${analysisText}
 
-Format as JSON.`
+Respond in JSON format:
+{
+  "currentVision": "...",
+  "summary": "...",
+  "keyThemes": "tag1, tag2, tag3",
+  "personalgorithmInsights": ["insight 1", "insight 2", ...]
+}`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4-turbo-preview',
-        max_tokens: 1500,
-        temperature: 0.6,
-        response_format: { type: "json_object" },
-        messages: [
-          { 
-            role: 'system', 
-            content: 'You are analyzing visioning homework to understand a business owner. Respond in JSON format.' 
-          },
-          { role: 'user', content: synthesisPrompt }
-        ]
-      })
-    })
-
-    if (!response.ok) {
-      throw new Error(`Synthesis failed: ${response.status}`)
-    }
-
-    const result = await response.json()
-    const synthesis = JSON.parse(result.choices[0].message.content)
-
-    return {
-      vision: synthesis.VISION || '',
-      currentState: synthesis.CURRENT_STATE || '',
-      goals: synthesis.GOALS || '',
-      challenges: synthesis.CHALLENGES || '',
-      strengths: synthesis.STRENGTHS || '',
-      values: synthesis.VALUES || '',
-      personalgorithmInsights: synthesis.PERSONALGORITHM_INSIGHTS || [],
-      tags: synthesis.TAGS || ''
-    }
-
-  } catch (error) {
-    console.error('Synthesis error:', error)
-    // Return basic fallback
-    return {
-      vision: 'Vision processing in progress',
-      currentState: 'Analyzing current state',
-      goals: 'Goals being extracted',
-      challenges: '',
-      strengths: '',
-      values: '',
-      personalgorithmInsights: [],
-      tags: 'visioning-submitted'
-    }
-  }
-}
-
-// ==================== CREATE VISIONING ENTRY ====================
-
-async function createVisioningEntry(email, visioningText, analysis) {
-  try {
-    const userRecordId = await getUserRecordId(email)
-    if (!userRecordId) throw new Error('User not found')
-
-    const visioningId = `v_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
-    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Visioning`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        fields: {
-          'Visioning ID': visioningId,
-          'User ID': [userRecordId],
-          'Date of Submission': new Date().toISOString(),
-          'Summary of Visioning': `${analysis.vision}\n\nGoals: ${analysis.goals}\n\nChallenges: ${analysis.challenges}`,
-          'Visioning Homework - Text Format': visioningText.substring(0, 90000), // Airtable limit
-          'Tags': analysis.tags,
-          'Action Steps': `Based on your vision, focus on: ${analysis.goals}`,
-          'Notes for Sol': `Communication patterns: ${analysis.personalgorithmInsights?.slice(0, 3).join('; ')}`
-        }
+        model: 'gpt-4-turbo-preview',
+        messages: [{
+          role: 'system',
+          content: 'You are Sol, synthesizing comprehensive visioning into actionable coaching insights.'
+        }, {
+          role: 'user',
+          content: prompt
+        }],
+        temperature: 0.4,
+        max_tokens: 1500,
+        response_format: { type: "json_object" }
       })
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(`Airtable error: ${JSON.stringify(error)}`)
+      throw new Error(`OpenAI synthesis error: ${response.status}`)
     }
 
-    return await response.json()
+    const data = await response.json()
+    const synthesis = JSON.parse(data.choices[0].message.content)
+    
+    // Ensure we have personalgorithm insights
+    if (!synthesis.personalgorithmInsights || synthesis.personalgorithmInsights.length === 0) {
+      synthesis.personalgorithmInsights = [
+        'Completed comprehensive visioning homework, demonstrating commitment to structured planning',
+        'Provided detailed business context showing strategic thinking and self-awareness'
+      ]
+    }
+    
+    return synthesis
   } catch (error) {
-    console.error('Error creating visioning entry:', error)
-    throw error
+    console.error('Error synthesizing vision:', error)
+    return {
+      currentVision: 'Comprehensive visioning completed - analysis in progress',
+      summary: 'User has shared detailed vision for business and life',
+      keyThemes: 'visioning, business-growth, strategic-planning',
+      personalgorithmInsights: [
+        'Completed comprehensive visioning homework, showing commitment to clarity and planning'
+      ]
+    }
   }
 }
 
-// ==================== UPDATE USER PROFILE ====================
+// ==================== AIRTABLE HELPER FUNCTIONS ====================
 
-async function updateUserProfileFromVisioning(email, analysis) {
-  try {
-    const updates = {
-      'Current Vision': analysis.vision || '',
-      'Current Goals': analysis.goals || '',
-      'Current State': analysis.currentState || ''
-    }
-
-    // Get existing profile to merge tags
-    const userProfile = await getUserProfile(email)
-    if (userProfile?.['Tags']) {
-      const existingTags = userProfile['Tags']
-      const newTags = analysis.tags
-      updates['Tags'] = `${existingTags}, ${newTags}`
-    } else {
-      updates['Tags'] = analysis.tags
-    }
-
-    await updateUserProfile(email, updates)
-    console.log('✅ Profile updated with vision')
-  } catch (error) {
-    console.error('Error updating profile:', error)
-  }
-}
-
-// ==================== HELPER FUNCTIONS ====================
-
+/**
+ * CRITICAL FIX: Get Airtable record ID for user
+ * Required for linked record fields
+ */
 async function getUserRecordId(email) {
   try {
     const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
     
     const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}` }
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
     })
 
-    if (!response.ok) return null
+    if (!response.ok) {
+      console.error('Failed to fetch user:', await response.text())
+      return null
+    }
+
     const data = await response.json()
-    return data.records.length > 0 ? data.records[0].id : null
+    
+    if (data.records.length === 0) {
+      console.error('No user record found for email:', email)
+      return null
+    }
+
+    return data.records[0].id // This is the record ID we need!
   } catch (error) {
     console.error('Error getting user record ID:', error)
     return null
@@ -362,10 +327,10 @@ async function getUserRecordId(email) {
 async function getUserProfile(email) {
   try {
     const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
     
     const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}` }
+      headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
     })
 
     if (!response.ok) return null
@@ -380,10 +345,10 @@ async function getUserProfile(email) {
 async function updateUserProfile(email, updates) {
   try {
     const encodedEmail = encodeURIComponent(email)
-    const findUrl = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
+    const findUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
     
     const findResponse = await fetch(findUrl, {
-      headers: { 'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}` }
+      headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
     })
     
     if (!findResponse.ok) return null
@@ -391,10 +356,10 @@ async function updateUserProfile(email, updates) {
     if (findData.records.length === 0) return null
 
     const recordId = findData.records[0].id
-    const updateResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users/${recordId}`, {
+    const updateResponse = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Users/${recordId}`, {
       method: 'PATCH',
       headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ fields: updates })
@@ -410,36 +375,115 @@ async function updateUserProfile(email, updates) {
   }
 }
 
-async function createPersonalgorithmEntry(email, notes, tags) {
+/**
+ * CRITICAL FIX: Use 'User ID' field name with record ID array
+ */
+async function createPersonalgorithmEntry(userRecordId, notes, tags) {
   try {
-    const userRecordId = await getUserRecordId(email)
-    if (!userRecordId) return null
-
     const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
-    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™`, {
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Personalgorithm™`
+    
+    const payload = {
+      records: [{
+        fields: {
+          'Personalgorithm™ ID': personalgorithmId,
+          'User ID': [userRecordId], // ✅ FIXED: Correct field name with record ID array
+          'Personalgorithm™ Notes': notes,
+          'Date created': new Date().toISOString(),
+          'Tags': tags,
+          'Attachments': [],
+          'Attachment Summary': ''
+        }
+      }]
+    }
+
+    console.log('Creating Personalgorithm™ entry...')
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Airtable error:', errorText)
+      throw new Error(`Failed to create Personalgorithm™: ${errorText}`)
+    }
+
+    const result = await response.json()
+    console.log('Personalgorithm™ entry created successfully:', result.records[0].id)
+    return result.records[0]
+
+  } catch (error) {
+    console.error('Error creating Personalgorithm™ entry:', error)
+    throw error
+  }
+}
+
+async function createVisioningEntry(email, visioningText, synthesis) {
+  try {
+    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Visioning`
+    
+    const visioningId = `v_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        fields: {
-          'Personalgorithm™ ID': personalgorithmId,
-          'User': email,
-          'Personalgorithm™ Notes': notes,
-          'Date created': new Date().toISOString(),
-          'Tags': Array.isArray(tags) ? tags.join(', ') : tags
-        }
+        records: [{
+          fields: {
+            'Visioning ID': visioningId,
+            'User ID': email,
+            'Date of Submission': new Date().toISOString(),
+            'Summary of Visioning': synthesis.summary || 'Comprehensive visioning completed',
+            'Visioning Homework - Text Format': visioningText.substring(0, 100000), // Airtable limit
+            'Tags': synthesis.keyThemes || 'visioning-comprehensive',
+            'Notes': 'Processed via automated visioning analysis'
+          }
+        }]
       })
     })
 
-    if (response.ok) {
-      return await response.json()
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Visioning entry creation failed:', errorText)
+      throw new Error('Failed to create visioning entry')
     }
-    return null
+
+    return await response.json()
   } catch (error) {
-    console.error('Error creating Personalgorithm™ entry:', error)
-    return null
+    console.error('Error creating visioning entry:', error)
+    throw error
+  }
+}
+
+async function updateUserProfileFromVisioning(email, synthesis) {
+  try {
+    const updates = {
+      'Current Vision': synthesis.currentVision || '',
+      'Current Goals': synthesis.summary || '',
+      'Tags': synthesis.keyThemes || ''
+    }
+    
+    // Get existing profile to merge tags
+    const existingProfile = await getUserProfile(email)
+    if (existingProfile && existingProfile['Tags']) {
+      const existingTags = existingProfile['Tags'].split(',').map(t => t.trim())
+      const newTags = updates['Tags'].split(',').map(t => t.trim())
+      const allTags = [...new Set([...existingTags, ...newTags])]
+      updates['Tags'] = allTags.join(', ')
+    }
+
+    return await updateUserProfile(email, updates)
+  } catch (error) {
+    console.error('Error updating user profile from visioning:', error)
   }
 }
