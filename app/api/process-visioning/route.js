@@ -429,7 +429,7 @@ async function createPersonalgorithmEntry(email, notes, tags) {
           'User': email,
           'Personalgorithm™ Notes': notes,
           'Date created': new Date().toISOString(),
-          'Tags': tags
+          'Tags': Array.isArray(tags) ? tags.join(', ') : tags
         }
       })
     })
