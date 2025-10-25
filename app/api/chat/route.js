@@ -219,6 +219,17 @@ async function getContextualMemory(userMessage, email, coreContext) {
 
 // ==================== SMART RESPONSE GENERATION ====================
 
+function shouldUseGPT4(userMessage, coreContext, contextualMemory) {
+  const gpt4Triggers = [
+    userMessage.length > 300,                              // Long messages
+    contextualMemory.coachingMethods?.length > 0,         // Business strategy
+    userMessage.toLowerCase().match(/vision|transform|breakthrough|stuck|strategy/), // Complex
+    coreContext.personalgorithmEssence?.length > 3        // Rich history
+  ]
+  
+  return gpt4Triggers.some(trigger => trigger) // Any one trigger = use GPT-4
+}
+
 async function generateSmartResponse(userMessage, conversationHistory, coreContext, contextualMemory, user) {
   try {
     // Decide which model to use (GPT-3.5 for routine, GPT-4 for complex)
