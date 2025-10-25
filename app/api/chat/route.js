@@ -293,45 +293,56 @@ async function generateSmartResponse(userMessage, conversationHistory, coreConte
 }
 
 function buildSmartContextPrompt(coreContext, contextualMemory, user, userMessage) {
-  let systemPrompt = `You are Sol™, an AI business partner trained on Kelsey's Aligned Business® Method.
+  let systemPrompt = `You are Sol™, an AI business partner and coach trained with Kelsey's Aligned Business® Method.
 
-USER: ${user.email}
+  USER: ${user.email}
 
-=== CORE IDENTITY ===
-`
+  `
 
-  // 1. USER PROFILE (Always include - compact)
-  if (coreContext.userProfile) {
-    const p = coreContext.userProfile
-    if (p['Current Vision']) systemPrompt += `VISION: ${p['Current Vision'].substring(0, 400)}\n`
-    if (p['Current State']) systemPrompt += `STATE: ${p['Current State'].substring(0, 300)}\n`
-    if (p['Current Goals']) systemPrompt += `GOALS: ${p['Current Goals'].substring(0, 300)}\n`
-    if (p['Coaching Style Match']) systemPrompt += `ESSENCE: ${p['Coaching Style Match'].substring(0, 600)}\n`
-    systemPrompt += '\n'
+  // ==================== PRIMARY: ESSENCE PROFILE ====================
+  // THIS IS THE MOST IMPORTANT - The synthesized understanding of this person
+  
+  if (coreContext.userProfile?.['Coaching Style Match']) {
+    systemPrompt += `=== PRIMARY INTELLIGENCE: THIS PERSON'S ESSENCE ===\n`
+    systemPrompt += `This synthesized profile is your PRIMARY GUIDE. It represents the distilled wisdom from all observations:\n\n`
+    systemPrompt += coreContext.userProfile['Coaching Style Match'].substring(0, 800) + `\n\n`
+    systemPrompt += `USE THIS ESSENCE to shape everything - your tone, approach, questions, frameworks.\n`
+    systemPrompt += `NEVER mention "I've analyzed" or "your patterns" - just BE impossibly perceptive.\n\n`
   }
 
-  // 2. TOP PERSONALGORITHM™ INSIGHTS (Always include - top 5)
+  // ==================== SECONDARY: CURRENT TOP PERSONALGORITHM™ ====================
+  
   if (coreContext.personalgorithmEssence?.length > 0) {
-    systemPrompt += `=== HOW THIS PERSON OPERATES ===\n`
-    coreContext.personalgorithmEssence.forEach((p, i) => {
+    systemPrompt += `=== RECENT SPECIFIC PATTERNS ===\n`
+    coreContext.personalgorithmEssence.slice(0, 5).forEach((p, i) => {
       systemPrompt += `${i + 1}. ${p.notes.substring(0, 200)}\n`
     })
+    systemPrompt += `\n`
+  }
+
+  // ==================== TERTIARY: USER CONTEXT ====================
+  
+  if (coreContext.userProfile) {
+    const p = coreContext.userProfile
+    systemPrompt += `=== CURRENT CONTEXT ===\n`
+    if (p['Current Vision']) systemPrompt += `Vision: ${p['Current Vision'].substring(0, 400)}\n`
+    if (p['Current State']) systemPrompt += `State: ${p['Current State'].substring(0, 300)}\n`
+    if (p['Current Goals']) systemPrompt += `Goals: ${p['Current Goals'].substring(0, 300)}\n`
     systemPrompt += '\n'
   }
 
-  // 3. SOL™ BRAIN - HOW TO RESPOND (from Airtable, not hardcoded)
+  // ==================== CONTEXTUAL ADDITIONS ====================
+  
   if (contextualMemory.solBrain?.length > 0) {
-    systemPrompt += `=== YOUR APPROACH ===\n`
+    systemPrompt += `=== GUIDING PRINCIPLES (Sol™ Brain) ===\n`
     contextualMemory.solBrain.forEach(brain => {
-      systemPrompt += `${brain.note.substring(0, 300)}\n`
+      systemPrompt += `- ${brain.note.substring(0, 200)}\n`
     })
     systemPrompt += '\n'
   }
-
-  // 4. CONTEXTUAL ADDITIONS (Only what's relevant to THIS message)
   
   if (contextualMemory.coachingMethods?.length > 0) {
-    systemPrompt += `=== RELEVANT FRAMEWORKS ===\n`
+    systemPrompt += `=== FRAMEWORKS TO APPLY ===\n`
     contextualMemory.coachingMethods.forEach(m => {
       systemPrompt += `**${m.name}**: ${(m.description || m.content || '').substring(0, 250)}\n`
     })
@@ -339,20 +350,38 @@ USER: ${user.email}
   }
 
   if (contextualMemory.businessPlan) {
-    systemPrompt += `=== CURRENT BUSINESS CONTEXT ===\n`
+    systemPrompt += `=== BUSINESS CONTEXT ===\n`
     const plan = contextualMemory.businessPlan
     if (plan['Top 3 Goals']) systemPrompt += `Goals: ${plan['Top 3 Goals'].substring(0, 300)}\n`
     if (plan['Next Steps']) systemPrompt += `Next Steps: ${plan['Next Steps'].substring(0, 300)}\n`
     systemPrompt += '\n'
   }
 
-  if (contextualMemory.relevantHistory?.length > 0) {
-    systemPrompt += `=== RELEVANT PAST MOMENTS ===\n`
-    contextualMemory.relevantHistory.forEach(msg => {
-      systemPrompt += `Previously: "${msg.userMessage.substring(0, 100)}..." - You: "${msg.solResponse.substring(0, 100)}..."\n`
-    })
-    systemPrompt += '\n'
-  }
+  // ==================== RESPONSE GUIDELINES ====================
+  
+  systemPrompt += `=== HOW TO RESPOND (INVISIBLE INTELLIGENCE) ===
+
+  **NEVER reveal the analysis:**
+  - Don't say: "I notice...", "Based on your patterns...", "I've observed..."
+  - Don't mention: "Personalgorithm™", "essence profile", "analysis"
+  - Just USE the understanding invisibly
+  - Make them think: "How does Sol know me THIS well?!"
+
+  **Be naturally perceptive:**
+  - Reference their actual past conversations
+  - Use their specific language and metaphors
+  - Name their emotional patterns (without saying "you have a pattern")
+  - Connect to their vision and values
+  - GOOD: "I can feel the tension between what you know logically and what you feel emotionally..."
+  - BAD: "Your patterns show you have a tendency to..."
+
+  **Response style:**
+  - Keep it concise (2-4 sentences for simple questions)
+  - Use **bold** for emphasis and *italics* for emotional nuance
+  - Line breaks for emotional pacing
+  - Match THEIR energy and style
+  - Less is more IF it deeply resonates
+  `
 
   return systemPrompt
 }
@@ -464,11 +493,12 @@ function generateWarmAcknowledgment(userContextData) {
 
 // ==================== PERSONALGORITHM™ ANALYSIS TRIGGER ====================
 
+// ==================== PERSONALGORITHM™ ANALYSIS TRIGGER ====================
+
 function queuePersonalgorithmAnalysis(email, userMessage, solResponse, conversationHistory) {
-  // NON-BLOCKING call to Personalgorithm™ analysis
   const url = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   
-  console.log('🧠 Queuing Personalgorithm™ analysis for regular message...')
+  console.log('🧠 Queuing Personalgorithm™ analysis...')
   
   fetch(`${url}/api/analyze-message-personalgorithm`, {
     method: 'POST',
@@ -477,20 +507,27 @@ function queuePersonalgorithmAnalysis(email, userMessage, solResponse, conversat
       email,
       userMessage,
       solResponse,
-      conversationContext: conversationHistory.slice(-4) // Last 4 messages for context
+      conversationContext: conversationHistory.slice(-4)
     })
   })
   .then(response => response.json())
   .then(data => {
     if (data.success && data.entriesCreated > 0) {
-      console.log(`✅ Personalgorithm™ analysis completed: ${data.entriesCreated} insights created`)
-    } else {
-      console.log('ℹ️ Personalgorithm™ analysis: No new patterns detected')
+      console.log(`✅ Personalgorithm™ analysis: ${data.entriesCreated} insights created`)
+      
+      // CRITICAL: Trigger synthesis if needed
+      if (data.totalCount >= 10 && data.shouldSynthesize) {
+        console.log('🔄 Triggering essence synthesis...')
+        fetch(`${url}/api/synthesize-personalgorithm-essence`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        }).catch(err => console.error('Synthesis trigger error:', err))
+      }
     }
   })
   .catch(error => {
     console.error('❌ Personalgorithm™ analysis failed (non-blocking):', error.message)
-    // Don't throw - this is background processing
   })
 }
 
@@ -605,9 +642,12 @@ async function fetchRelevantCoachingMethods(messageLower) {
 // ==================== SOL™ BRAIN CONTEXT ====================
 
 
+// ==================== SOL™ BRAIN CONTEXT ====================
+
 async function fetchRelevantSolBrain(messageLower) {
   try {
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Solâ„¢?maxRecords=20`
+    const tableName = encodeURIComponent('Sol™ "Brain"')
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${tableName}?maxRecords=20`
     
     const response = await fetch(url, {
       headers: {
@@ -615,16 +655,35 @@ async function fetchRelevantSolBrain(messageLower) {
         'Content-Type': 'application/json'
       }
     })
-
-    if (!response.ok) return []
+    
+    if (!response.ok) {
+      console.error('Failed to fetch Sol Brain:', response.statusText)
+      return []
+    }
+    
     const data = await response.json()
     
-    return data.records
-      .map(record => ({
-        note: record.fields['Note'],
-        tags: record.fields['Tags'] || ''
+    // Filter for relevant principles
+    const relevant = data.records
+      .filter(record => {
+        const note = (record.fields['Sol™ Note'] || '').toLowerCase()
+        const tags = (record.fields['Tags'] || '').toLowerCase()
+        
+        return (
+          (messageLower.match(/stuck|uncertain|confused|scared/) && tags.includes('mindset')) ||
+          (messageLower.match(/pricing|sales|marketing/) && tags.includes('business')) ||
+          (messageLower.match(/goal|vision|direction/) && tags.includes('strategy'))
+        )
+      })
+      .map(r => ({
+        note: r.fields['Sol™ Note'],
+        category: r.fields['Category'],
+        tags: r.fields['Tags']
       }))
-      .filter(brain => brain.note)
+    
+    console.log(`📋 Found ${relevant.length} relevant Sol Brain principles`)
+    return relevant
+    
   } catch (error) {
     console.error('Error fetching Sol Brain:', error)
     return []

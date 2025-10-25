@@ -1,12 +1,10 @@
 // app/api/synthesize-personalgorithm-essence/route.js
-// ENHANCED VERSION - Creates "impossibly perceptive" Essence Profiles
-// Implements synthesis over summarization + pattern evolution tracking
-// Based on the conversation: "How does Sol know me THAT well?!"
+// THE MAGIC FILE - Creates impossibly perceptive user profiles
 
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
-  console.log('=== SYNTHESIZING IMPOSSIBLY PERCEPTIVE ESSENCE PROFILE ===')
+  console.log('=== SYNTHESIZING PERSONALGORITHMâ„¢ ESSENCE ===')
   
   try {
     const { email, forceRegenerate = false } = await request.json()
@@ -17,7 +15,7 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
-    console.log('Synthesizing deep essence for:', email)
+    console.log('Synthesizing essence for:', email)
 
     // Get user profile
     const userProfile = await getUserProfile(email)
@@ -27,41 +25,41 @@ export async function POST(request) {
       }, { status: 404 })
     }
 
-    // Fetch ALL Personalgorithm™ entries (chronological for pattern evolution)
-    const allPersonalgorithm = await fetchAllPersonalgorithmChronological(email)
-    
-    if (allPersonalgorithm.length < 5) {
-      return NextResponse.json({
-        success: false,
-        message: `Need at least 5 Personalgorithm™ entries to create meaningful synthesis. Currently have: ${allPersonalgorithm.length}`,
-        count: allPersonalgorithm.length
-      })
-    }
-
     // Check if we need to regenerate
     const lastSynthesis = userProfile['Last Synthesis Date']
+    const personalgorithmCount = await getPersonalgorithmCount(email)
     
     if (!forceRegenerate && lastSynthesis) {
       const daysSinceSynthesis = (Date.now() - new Date(lastSynthesis).getTime()) / (1000 * 60 * 60 * 24)
-      const newEntriesSinceLastSynthesis = allPersonalgorithm.filter(e => 
-        new Date(e.dateCreated) > new Date(lastSynthesis)
-      ).length
       
-      // Only regenerate if significant change
-      if (daysSinceSynthesis < 7 && newEntriesSinceLastSynthesis < 15) {
+      // Only regenerate if:
+      // - More than 7 days since last synthesis
+      // - OR more than 10 new Personalgorithm entries since last synthesis
+      if (daysSinceSynthesis < 7 && personalgorithmCount < 10) {
         return NextResponse.json({
           success: true,
           message: 'Essence is current - no regeneration needed',
           lastSynthesis: lastSynthesis,
-          skipReason: `Only ${daysSinceSynthesis.toFixed(1)} days and ${newEntriesSinceLastSynthesis} new entries since last synthesis`
+          skipReason: 'recent_synthesis'
         })
       }
     }
 
-    console.log(`Synthesizing from ${allPersonalgorithm.length} Personalgorithm™ entries...`)
+    // Fetch ALL Personalgorithmâ„¢ entries
+    const allPersonalgorithm = await fetchAllPersonalgorithm(email)
+    
+    if (allPersonalgorithm.length === 0) {
+      return NextResponse.json({
+        success: false,
+        message: 'No Personalgorithmâ„¢ data to synthesize',
+        count: 0
+      })
+    }
 
-    // Generate the IMPOSSIBLY PERCEPTIVE ESSENCE PROFILE
-    const essenceProfile = await generateDeepEssenceProfile(allPersonalgorithm, userProfile)
+    console.log(`Synthesizing from ${allPersonalgorithm.length} Personalgorithmâ„¢ entries...`)
+
+    // Generate the ESSENCE PROFILE
+    const essenceProfile = await generateEssenceProfile(allPersonalgorithm, userProfile)
     
     if (!essenceProfile) {
       return NextResponse.json({
@@ -76,152 +74,131 @@ export async function POST(request) {
       'Last Synthesis Date': new Date().toISOString()
     })
 
-    console.log('✅ IMPOSSIBLY PERCEPTIVE Essence Profile synthesized and saved')
+    console.log('âœ… Personalgorithmâ„¢ Essence synthesized and saved')
 
     return NextResponse.json({
       success: true,
-      message: 'Personalgorithm™ Essence profile generated successfully',
+      message: 'Personalgorithmâ„¢ Essence profile generated successfully',
       entriesAnalyzed: allPersonalgorithm.length,
       essenceLength: essenceProfile.length,
-      preview: essenceProfile.substring(0, 250) + '...'
+      preview: essenceProfile.substring(0, 200) + '...'
     })
 
   } catch (error) {
-    console.error('❌ Essence synthesis error:', error)
+    console.error('âŒ Essence synthesis error:', error)
     return NextResponse.json({
-      error: 'Failed to synthesize Personalgorithm™ essence',
+      error: 'Failed to synthesize Personalgorithmâ„¢ essence',
       details: error.message
     }, { status: 500 })
   }
 }
 
-async function generateDeepEssenceProfile(personalgorithmEntries, userProfile) {
+async function generateEssenceProfile(personalgorithmEntries, userProfile) {
   try {
-    // Organize entries by category AND time for evolution tracking
+    // Organize entries by category/theme
     const entriesByCategory = {
       communication: [],
-      microPatterns: [],
-      decisionMaking: [],
-      transformation: [],
       emotional: [],
-      business: [],
-      evolution: [],
-      unique: []
+      transformation: [],
+      decisionMaking: [],
+      patterns: [],
+      growth: [],
+      resistance: [],
+      values: []
     }
 
     // Categorize entries
     personalgorithmEntries.forEach(entry => {
+      const note = entry.notes.toLowerCase()
       const tags = (entry.tags || '').toLowerCase()
-      const notes = (entry.notes || '').toLowerCase()
       
-      if (tags.includes('micro-pattern') || tags.includes('punctuation') || tags.includes('language-pattern')) {
-        entriesByCategory.microPatterns.push(entry)
-      } else if (tags.includes('communication') || notes.includes('express') || notes.includes('language')) {
-        entriesByCategory.communication.push(entry)
-      } else if (tags.includes('decision') || tags.includes('validation') || notes.includes('decide')) {
-        entriesByCategory.decisionMaking.push(entry)
-      } else if (tags.includes('transformation') || tags.includes('breakthrough') || notes.includes('trigger')) {
-        entriesByCategory.transformation.push(entry)
-      } else if (tags.includes('emotional') || tags.includes('energy') || notes.includes('feel')) {
-        entriesByCategory.emotional.push(entry)
-      } else if (tags.includes('business') || tags.includes('pricing') || tags.includes('marketing')) {
-        entriesByCategory.business.push(entry)
-      } else if (tags.includes('evolution') || tags.includes('shift') || tags.includes('growth')) {
-        entriesByCategory.evolution.push(entry)
-      } else {
-        entriesByCategory.unique.push(entry)
+      if (note.includes('communicat') || note.includes('speak') || note.includes('punctuation') || note.includes('express')) {
+        entriesByCategory.communication.push(entry.notes)
+      }
+      if (note.includes('emotion') || note.includes('feeling') || note.includes('process') || tags.includes('emotional')) {
+        entriesByCategory.emotional.push(entry.notes)
+      }
+      if (note.includes('transform') || note.includes('breakthrough') || note.includes('shift') || note.includes('change')) {
+        entriesByCategory.transformation.push(entry.notes)
+      }
+      if (note.includes('decision') || note.includes('choose') || note.includes('commit') || note.includes('certainty')) {
+        entriesByCategory.decisionMaking.push(entry.notes)
+      }
+      if (note.includes('pattern') || note.includes('tends to') || note.includes('usually') || note.includes('often')) {
+        entriesByCategory.patterns.push(entry.notes)
+      }
+      if (note.includes('growth') || note.includes('strength') || note.includes('excel') || note.includes('good at')) {
+        entriesByCategory.growth.push(entry.notes)
+      }
+      if (note.includes('resist') || note.includes('avoid') || note.includes('stuck') || note.includes('block')) {
+        entriesByCategory.resistance.push(entry.notes)
+      }
+      if (note.includes('value') || note.includes('believe') || note.includes('important') || note.includes('matter')) {
+        entriesByCategory.values.push(entry.notes)
       }
     })
 
-    // Track pattern evolution: early vs recent
-    const totalEntries = personalgorithmEntries.length
-    const earlyEntries = personalgorithmEntries.slice(-Math.min(5, totalEntries)) // Oldest 5
-    const recentEntries = personalgorithmEntries.slice(0, Math.min(5, totalEntries)) // Newest 5
-
-    // Build the DEEP synthesis prompt
-    const synthesisPrompt = `You are synthesizing ${totalEntries} Personalgorithm™ observations into an "IMPOSSIBLY PERCEPTIVE" Essence Profile.
+    const synthesisPrompt = `You are creating an "Essence Profile" - a compact, deeply perceptive summary that makes Sol impossibly good at understanding this person.
 
 USER: ${userProfile['User ID']}
 CURRENT VISION: ${userProfile['Current Vision'] || 'Not yet defined'}
 CURRENT STATE: ${userProfile['Current State'] || 'Not yet defined'}
-CURRENT GOALS: ${userProfile['Current Goals'] || 'Not yet defined'}
 
-PERSONALGORITHM™ DATA (${totalEntries} observations):
+PERSONALGORITHMâ„¢ DATA (${personalgorithmEntries.length} observations):
 
-═══════════════════════════════════════
-MICRO-PATTERNS (${entriesByCategory.microPatterns.length} insights):
-${entriesByCategory.microPatterns.slice(0, 8).map(e => e.notes).join('\n\n') || 'None yet'}
+COMMUNICATION PATTERNS (${entriesByCategory.communication.length} observations):
+${entriesByCategory.communication.slice(0, 5).join('\n') || 'None yet'}
 
-═══════════════════════════════════════
-COMMUNICATION ESSENCE (${entriesByCategory.communication.length} insights):
-${entriesByCategory.communication.slice(0, 8).map(e => e.notes).join('\n\n') || 'None yet'}
+EMOTIONAL PROCESSING (${entriesByCategory.emotional.length} observations):
+${entriesByCategory.emotional.slice(0, 5).join('\n') || 'None yet'}
 
-═══════════════════════════════════════
-DECISION-MAKING FINGERPRINT (${entriesByCategory.decisionMaking.length} insights):
-${entriesByCategory.decisionMaking.slice(0, 8).map(e => e.notes).join('\n\n') || 'None yet'}
+TRANSFORMATION TRIGGERS (${entriesByCategory.transformation.length} observations):
+${entriesByCategory.transformation.slice(0, 5).join('\n') || 'None yet'}
 
-═══════════════════════════════════════
-TRANSFORMATION TRIGGERS (${entriesByCategory.transformation.length} insights):
-${entriesByCategory.transformation.slice(0, 8).map(e => e.notes).join('\n\n') || 'None yet'}
+DECISION-MAKING STYLE (${entriesByCategory.decisionMaking.length} observations):
+${entriesByCategory.decisionMaking.slice(0, 5).join('\n') || 'None yet'}
 
-═══════════════════════════════════════
-EMOTIONAL SIGNATURES (${entriesByCategory.emotional.length} insights):
-${entriesByCategory.emotional.slice(0, 8).map(e => e.notes).join('\n\n') || 'None yet'}
+BEHAVIORAL PATTERNS (${entriesByCategory.patterns.length} observations):
+${entriesByCategory.patterns.slice(0, 5).join('\n') || 'None yet'}
 
-═══════════════════════════════════════
-BUSINESS APPROACH (${entriesByCategory.business.length} insights):
-${entriesByCategory.business.slice(0, 8).map(e => e.notes).join('\n\n') || 'None yet'}
+GROWTH EDGES (${entriesByCategory.growth.length} observations):
+${entriesByCategory.growth.slice(0, 5).join('\n') || 'None yet'}
 
-═══════════════════════════════════════
-PATTERN EVOLUTION (early vs recent):
+RESISTANCE PATTERNS (${entriesByCategory.resistance.length} observations):
+${entriesByCategory.resistance.slice(0, 5).join('\n') || 'None yet'}
 
-EARLY PATTERNS:
-${earlyEntries.map(e => `• ${e.notes}`).join('\n')}
+CORE VALUES & BELIEFS (${entriesByCategory.values.length} observations):
+${entriesByCategory.values.slice(0, 5).join('\n') || 'None yet'}
 
-RECENT PATTERNS:
-${recentEntries.map(e => `• ${e.notes}`).join('\n')}
+Create a comprehensive "Essence Profile" (max 1000 words) that synthesizes ALL of this into a deeply perceptive guide for Sol. Structure it like this:
 
-═══════════════════════════════════════
-UNIQUE FACTORS (${entriesByCategory.unique.length} insights):
-${entriesByCategory.unique.slice(0, 5).map(e => e.notes).join('\n\n') || 'None yet'}
+=== COMMUNICATION SIGNATURE ===
+How they express themselves uniquely. Their punctuation patterns, word choices, emphasis techniques, thinking structure. What makes their voice THEIRS.
 
-═══════════════════════════════════════
+=== EMOTIONAL INTELLIGENCE MAP ===
+How they process feelings. What emotions trigger action vs paralysis. Their relationship with uncertainty, excitement, fear, joy. How they make meaning from emotions.
 
-Create a comprehensive 900-1200 word "Essence Profile" that will make Sol IMPOSSIBLY PERCEPTIVE.
+=== TRANSFORMATION ARCHITECTURE ===
+What creates breakthroughs for them specifically. What approaches land vs fall flat. What they need to hear/experience to shift. Their unique path to growth.
 
-This profile will be loaded into EVERY conversation. It must enable Sol to:
-• Reference specific micro-patterns ("I notice you're using ellipses a lot...")
-• Name exact emotional signatures ("that tension between 'what I'm worth' and 'what people will pay'")
-• Track evolution ("you've gone from asking permission to just informing me")
-• Recognize transformation triggers instantly
-• Respond in their exact resonance frequency
+=== DECISION-MAKING DNA ===
+How they evaluate options. What certainty they need. Whether they seek permission, validation, or just inform. How quickly they commit. What makes them say "yes."
 
-Structure your synthesis:
+=== BEHAVIORAL PATTERNS & RHYTHMS ===
+Recurring behaviors, thought loops, response patterns. What they do when stuck. What they do when aligned. Micro-patterns that reveal macro-truths.
 
-**COMMUNICATION SIGNATURE:**
-HOW they express themselves uniquely - their specific language patterns, punctuation habits, energy shifts, processing style. Be SPECIFIC about micro-patterns that reveal their thinking (ellipses = uncertainty, CAPS = conviction building, quotes = doubt, etc.)
+=== GROWTH TRAJECTORY ===
+Their strengths, gifts, natural abilities. Where they're evolving. What's becoming easier. Where they're building confidence. What's emerging.
 
-**TRANSFORMATION ARCHITECTURE:**
-WHAT creates breakthroughs for them - not generic "needs validation" but "transforms fastest after emotional expression, NOT logical analysis - breakthroughs follow feelings, not frameworks." What they respond to, what shuts them down, their unique path to clarity.
+=== RESISTANCE & SHADOWS ===
+What holds them back. Limiting beliefs. Fear patterns. What they avoid. What they need to release. Gaps between who they are and who they're becoming.
 
-**DECISION-MAKING DNA:**
-HOW they evaluate and commit - external vs internal processing, validation patterns, relationship with "should" vs "want", fear of wrong choice vs excitement about possibility. Their EXACT sequence from uncertainty to commitment.
+=== RESONANCE MAP ===
+Language that lands with them. Metaphors that work. Coaching approaches that create shifts. What to reference. What to avoid. How to make them feel impossibly SEEN.
 
-**EMOTIONAL LANDSCAPE:**
-Their relationship with feelings - when they light up, when they freeze, what depletes vs energizes, how overwhelm shows up, how certainty emerges. SPECIFIC emotional signatures, not generic descriptors.
+Be SPECIFIC. Use exact details from their patterns. Make connections across categories. This should feel like "How does Sol know me so well?!" 
 
-**BUSINESS RELATIONSHIP:**
-Their approach to pricing, sales, marketing, visibility, money, success - where they flow vs resist. SPECIFIC beliefs and patterns around worth, value, charging, selling.
-
-**PATTERN EVOLUTION:**
-How they've SHIFTED over time - what's changed vs what stays constant. Movement toward more/less agency, certainty, openness. The transformation already happening.
-
-**RESONANCE MAP:**
-The exact language, metaphors, frameworks, approaches that LAND with them. What creates recognition vs what bounces off. Their specific "yes" frequency.
-
-Write in second person ("You...") as if briefing Sol on how to be impossibly perceptive with this human. Be HYPER-SPECIFIC. Use their actual language. Reference their exact patterns. Make every sentence useful for creating "How does Sol know me THAT well?!" moments.
-
-This is not a summary - it's a synthesis that captures WHO they are and HOW to reach them.`
+Write as a synthesis, not a list. Connect the dots. Show the deeper patterns.`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -231,28 +208,29 @@ This is not a summary - it's a synthesis that captures WHO they are and HOW to r
       },
       body: JSON.stringify({
         model: 'gpt-4-turbo-preview',
-        max_tokens: 1800,
-        temperature: 0.35,
+        max_tokens: 2000,
+        temperature: 0.4,
         messages: [{ role: 'user', content: synthesisPrompt }]
       })
     })
 
     if (!response.ok) {
-      console.error('Essence generation failed:', response.status)
-      return null
+      throw new Error(`Essence synthesis failed: ${response.status}`)
     }
 
     const result = await response.json()
-    const essence = result.choices[0].message.content.trim()
+    const essenceProfile = result.choices[0].message.content.trim()
     
-    console.log(`Generated ${essence.length} character Essence Profile`)
-    return essence
+    console.log('âœ… Essence profile generated:', essenceProfile.length, 'characters')
+    return essenceProfile
 
   } catch (error) {
     console.error('Error generating essence profile:', error)
-    return null
+    throw error
   }
 }
+
+// ==================== HELPER FUNCTIONS ====================
 
 async function getUserProfile(email) {
   try {
@@ -268,7 +246,6 @@ async function getUserProfile(email) {
 
     if (!response.ok) return null
     const data = await response.json()
-    
     return data.records.length > 0 ? data.records[0].fields : null
   } catch (error) {
     console.error('Error fetching user profile:', error)
@@ -276,11 +253,10 @@ async function getUserProfile(email) {
   }
 }
 
-async function fetchAllPersonalgorithmChronological(email) {
+async function fetchAllPersonalgorithm(email) {
   try {
     const encodedEmail = encodeURIComponent(email)
-    // Fetch chronologically (newest first) for evolution tracking
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=150`
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithmâ„¢?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=100`
     
     const response = await fetch(url, {
       headers: {
@@ -289,24 +265,26 @@ async function fetchAllPersonalgorithmChronological(email) {
       }
     })
 
-    if (!response.ok) {
-      console.error('Failed to fetch Personalgorithm™ entries:', response.status)
-      return []
-    }
-    
+    if (!response.ok) return []
     const data = await response.json()
     
-    console.log(`Fetched ${data.records.length} Personalgorithm™ entries chronologically`)
-    
     return data.records.map(record => ({
-      notes: record.fields['Personalgorithm™ Notes'],
+      notes: record.fields['Personalgorithmâ„¢ Notes'],
       dateCreated: record.fields['Date created'],
       tags: record.fields['Tags'] || ''
     })).filter(item => item.notes)
-
   } catch (error) {
-    console.error('Error fetching Personalgorithm™ data:', error)
+    console.error('Error fetching Personalgorithm:', error)
     return []
+  }
+}
+
+async function getPersonalgorithmCount(email) {
+  try {
+    const data = await fetchAllPersonalgorithm(email)
+    return data.length
+  } catch (error) {
+    return 0
   }
 }
 
@@ -316,34 +294,27 @@ async function updateUserProfile(email, updates) {
     const findUrl = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
     
     const findResponse = await fetch(findUrl, {
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
+      headers: { 'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}` }
     })
-
+    
     if (!findResponse.ok) return null
     const findData = await findResponse.json()
-    
     if (findData.records.length === 0) return null
-    
+
     const recordId = findData.records[0].id
-    const updateUrl = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users/${recordId}`
-    
-    const updateResponse = await fetch(updateUrl, {
+    const updateResponse = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users/${recordId}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        fields: updates
-      })
+      body: JSON.stringify({ fields: updates })
     })
 
-    if (!updateResponse.ok) return null
-    return await updateResponse.json()
-
+    if (updateResponse.ok) {
+      return await updateResponse.json()
+    }
+    return null
   } catch (error) {
     console.error('Error updating user profile:', error)
     return null
