@@ -631,7 +631,6 @@ async function fetchRelevantCoachingMethods(messageLower) {
     const data = await response.json()
     console.log(`✅ Coaching methods loaded: ${data.records.length} methods`)
     
-    // Filter methods relevant to the message
     return data.records
       .map(record => ({
         name: record.fields['Name of Lesson'],
@@ -648,6 +647,7 @@ async function fetchRelevantCoachingMethods(messageLower) {
     return []
   }
 }
+
 
 // ==================== SOL™ BRAIN CONTEXT ====================
 

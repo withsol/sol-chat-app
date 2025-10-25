@@ -256,7 +256,14 @@ async function getUserProfile(email) {
 async function fetchAllPersonalgorithm(email) {
   try {
     const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithmâ„¢?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=100`
+    
+    // URL-encode the table name (it has a ™ symbol)
+    const tableName = 'Personalgorithm™'
+    const encodedTableName = encodeURIComponent(tableName)
+    
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodedTableName}?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=100`
+    
+    console.log('Fetching all Personalgorithm™ entries for:', email)
     
     const response = await fetch(url, {
       headers: {
@@ -265,11 +272,17 @@ async function fetchAllPersonalgorithm(email) {
       }
     })
 
-    if (!response.ok) return []
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`Failed to fetch Personalgorithm™ entries (${response.status}):`, errorText)
+      return []
+    }
+    
     const data = await response.json()
+    console.log(`✅ Fetched ${data.records.length} Personalgorithm™ entries`)
     
     return data.records.map(record => ({
-      notes: record.fields['Personalgorithmâ„¢ Notes'],
+      notes: record.fields['Personalgorithm™ Notes'],
       dateCreated: record.fields['Date created'],
       tags: record.fields['Tags'] || ''
     })).filter(item => item.notes)
@@ -278,6 +291,7 @@ async function fetchAllPersonalgorithm(email) {
     return []
   }
 }
+
 
 async function getPersonalgorithmCount(email) {
   try {

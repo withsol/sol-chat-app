@@ -207,13 +207,19 @@ async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated')
     // CRITICAL: Get the User record ID for proper linking
     const userRecordId = await getUserRecordId(email)
     if (!userRecordId) {
-      console.error('âŒ Cannot create Personalgorithmâ„¢ entry - user record not found for:', email)
+      console.error('❌ Cannot create Personalgorithm™ entry - user record not found for:', email)
       return null
     }
 
     const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
-    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithmâ„¢`, {
+    // URL-encode the table name (it has a ™ symbol)
+    const tableName = 'Personalgorithm™'
+    const encodedTableName = encodeURIComponent(tableName)
+    
+    console.log('Creating Personalgorithm™ entry for:', email)
+    
+    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodedTableName}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
@@ -221,9 +227,9 @@ async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated')
       },
       body: JSON.stringify({
         fields: {
-          'Personalgorithmâ„¢ ID': personalgorithmId,
-          'User': [userRecordId], // âœ… CORRECT: Link to User record, not email string
-          'Personalgorithmâ„¢ Notes': notes,
+          'Personalgorithm™ ID': personalgorithmId,
+          'User': [userRecordId],
+          'Personalgorithm™ Notes': notes,
           'Date created': new Date().toISOString(),
           'Tags': typeof tags === 'string' ? tags : tags.join(', ')
         }
@@ -232,16 +238,16 @@ async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated')
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Failed to create Personalgorithmâ„¢ entry:', response.status, errorText)
+      console.error(`Failed to create Personalgorithm™ entry (${response.status}):`, errorText)
       return null
     }
 
     const result = await response.json()
-    console.log('âœ… Personalgorithmâ„¢ entry created:', result.id)
+    console.log('✅ Personalgorithm™ entry created:', result.id)
     return result
     
   } catch (error) {
-    console.error('Error creating Personalgorithmâ„¢ entry:', error)
+    console.error('Error creating Personalgorithm™ entry:', error)
     return null
   }
 }
