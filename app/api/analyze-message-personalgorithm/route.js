@@ -278,39 +278,82 @@ async function getRecentPersonalgorithm(email, limit = 10) {
   }
 }
 
-async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated') {
+async function createPersonalgorithmEntry(email, note, tags) {
   try {
-    const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
-    const response = await fetch(`https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        fields: {
-          'Personalgorithm™ ID': personalgorithmId,
-          'User ID': email,
-          'Personalgorithm™ Notes': notes,
-          'Date created': new Date().toISOString(),
-          'Tags': typeof tags === 'string' ? tags : tags.join(', ')
-        }
-      })
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Failed to create Personalgorithm™ entry:', response.status, errorText)
+    // CRITICAL: Get user RECORD ID (not email!)
+    const userRecordId = await getUserRecordId(email)
+    if (!userRecordId) {
+      console.error('❌ User record not found for Personalgorithm™ entry:', email)
       return null
     }
 
-    const result = await response.json()
-    console.log('✅ Personalgorithm™ entry created:', result.id)
-    return result
+    const personalgorithmId = `pg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    const response = await fetch(
+      `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithm™`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fields: {
+            'Personalgorithm™ ID': personalgorithmId,
+            'User': [userRecordId], // ← MUST be array of record IDs, not email!
+            'Personalgorithm™ Notes': note,
+            'Date created': new Date().toISOString(),
+            'Tags': tags
+          }
+        })
+      }
+    )
+
+    if (!response.ok) {
+      const error = await response.json()
+      console.error('❌ Failed to create Personalgorithm™ entry:', response.status, JSON.stringify(error))
+      return null
+    }
+
+    const data = await response.json()
+    console.log('✅ Created Personalgorithm™ entry:', data.id)
+    return data
     
   } catch (error) {
-    console.error('Error creating Personalgorithm™ entry:', error)
+    console.error('❌ Error creating Personalgorithm™ entry:', error)
+    return null
+  }
+}
+
+// Helper function to get the Airtable record ID for a user
+async function getUserRecordId(email) {
+  try {
+    const encodedEmail = encodeURIComponent(email)
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      console.error('❌ Failed to fetch user record:', response.statusText)
+      return null
+    }
+    
+    const data = await response.json()
+    
+    if (data.records.length === 0) {
+      console.error('❌ No user record found for email:', email)
+      return null
+    }
+    
+    return data.records[0].id // This is the Airtable record ID (like "recXXXXXX")
+    
+  } catch (error) {
+    console.error('❌ Error fetching user record ID:', error)
     return null
   }
 }
