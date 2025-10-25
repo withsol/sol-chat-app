@@ -1,10 +1,7 @@
-// app/api/analyze-message-personalgorithm/route.js
-// CORRECTED VERSION - Proper User Linking + Deep Pattern Analysis
-
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
-  console.log('=== ANALYZING MESSAGE FOR PERSONALGORITHMâ„¢ ===')
+  console.log('=== ANALYZING MESSAGE FOR PERSONALGORITHM™ ===')
   
   try {
     const { email, userMessage, solResponse, conversationContext = [] } = await request.json()
@@ -15,28 +12,35 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
-    // Only analyze meaningful conversations (avoid simple greetings, etc.)
+    // Only analyze meaningful conversations
     if (!shouldAnalyzeForPersonalgorithm(userMessage, solResponse)) {
       return NextResponse.json({
         success: true,
         analyzed: false,
-        reason: 'Conversation too brief for meaningful Personalgorithmâ„¢ analysis',
+        reason: 'Conversation too brief for meaningful Personalgorithm™ analysis',
         entriesCreated: 0
       })
     }
 
-    console.log('Analyzing conversation for Personalgorithmâ„¢ insights...')
+    console.log('Analyzing conversation for Personalgorithm™ insights...')
 
-    // Generate DEEP Personalgorithmâ„¢ insights
-    const insights = await generateDeepPersonalgorithmInsights(userMessage, solResponse, conversationContext)
+    // Get user's name for personalized analysis
+    const userName = await getUserName(email)
+    
+    // Generate DEEP Personalgorithm™ insights with user's name
+    const insights = await generateDeepPersonalgorithmInsights(
+      userMessage, 
+      solResponse, 
+      conversationContext,
+      userName  // Pass the name!
+    )
     
     if (insights && insights.length > 0) {
-      // Create entries for each insight
       const createdEntries = []
       for (const insight of insights) {
         const entry = await createPersonalgorithmEntry(email, insight.note, insight.tags)
         if (entry) {
-          console.log(`âœ… Created Personalgorithmâ„¢ entry for ${email}`)
+          console.log(`✅ Created Personalgorithm™ entry for ${email}`)
           createdEntries.push({
             insight: insight.note.substring(0, 100) + '...',
             entryId: entry.id,
@@ -50,7 +54,7 @@ export async function POST(request) {
         analyzed: true,
         entriesCreated: createdEntries.length,
         createdEntries: createdEntries,
-        message: `Added ${createdEntries.length} new Personalgorithmâ„¢ insights from this conversation`
+        message: `Added ${createdEntries.length} new Personalgorithm™ insights from this conversation`
       })
     }
 
@@ -62,86 +66,122 @@ export async function POST(request) {
     })
 
   } catch (error) {
-    console.error('âŒ Message Personalgorithmâ„¢ analysis error:', error)
+    console.error('❌ Message Personalgorithm™ analysis error:', error)
     return NextResponse.json({
-      error: 'Failed to analyze message for Personalgorithmâ„¢',
+      error: 'Failed to analyze message for Personalgorithm™',
       details: error.message
     }, { status: 500 })
   }
 }
 
+// NEW FUNCTION: Get user's name from profile
+async function getUserName(email) {
+  try {
+    const encodedEmail = encodeURIComponent(email)
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Users?filterByFormula={User ID}="${encodedEmail}"`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      // Fallback to email name
+      return email.split('@')[0].split('.')[0] || 'User'
+    }
+    
+    const data = await response.json()
+    
+    if (data.records.length === 0) {
+      // Fallback to email name
+      return email.split('@')[0].split('.')[0] || 'User'
+    }
+    
+    const user = data.records[0].fields
+    
+    // Try to get name from various possible fields
+    const name = user['Name'] || user['First Name'] || user['Full Name'] || email.split('@')[0].split('.')[0]
+    
+    // Capitalize first letter
+    return name.charAt(0).toUpperCase() + name.slice(1)
+    
+  } catch (error) {
+    console.error('Error getting user name:', error)
+    // Fallback to email name
+    return email.split('@')[0].split('.')[0] || 'User'
+  }
+}
+
 function shouldAnalyzeForPersonalgorithm(userMessage, solResponse) {
-  // Skip analysis for very short exchanges
   if (userMessage.length < 30 || solResponse.length < 50) {
     return false
   }
   
-  // Skip generic greetings and simple responses
   const genericPatterns = [
-    /^(hi|hello|hey|thanks|thank you|ok|okay|yes|no)\.?\s*$/i,
-    /^(good morning|good afternoon|good evening)\.?\s*$/i,
-    /^(how are you|what\'s up)\.?\s*$/i
+    /^(hi|hello|hey|thanks|thank you|okay|ok|got it)/i,
+    /^(bye|goodbye|see you|talk soon)/i
   ]
   
-  for (const pattern of genericPatterns) {
-    if (pattern.test(userMessage.trim())) {
-      return false
-    }
-  }
-  
-  return true
+  return !genericPatterns.some(pattern => pattern.test(userMessage.trim()))
 }
 
-async function generateDeepPersonalgorithmInsights(userMessage, solResponse, conversationContext) {
+// UPDATED FUNCTION: Use user's actual name instead of "USER"
+async function generateDeepPersonalgorithmInsights(userMessage, solResponse, conversationContext, userName) {
   try {
-    const analysisPrompt = `You are analyzing a coaching conversation to identify SPECIFIC Personalgorithmâ„¢ patterns - the unique ways this individual operates, communicates, and transforms.
+    const analysisPrompt = `You are analyzing a coaching conversation to identify SPECIFIC Personalgorithm™ patterns about ${userName} (the person being coached), NOT about Sol (the AI coach).
 
-USER MESSAGE: "${userMessage}"
-SOL RESPONSE: "${solResponse}"
+**CRITICAL:** Analyze ${userName}'s patterns - how ${userName} communicates, processes, and operates. Do NOT analyze Sol's coaching style.
+
+${userName.toUpperCase()}'S MESSAGE: "${userMessage}"
+SOL'S RESPONSE: "${solResponse}"
 
 PREVIOUS CONTEXT: ${conversationContext.map(msg => `${msg.role}: "${msg.content}"`).join('\n')}
 
-Analyze for these SPECIFIC pattern categories:
+Analyze ${userName}'s patterns in these categories:
 
-1. COMMUNICATION SIGNATURE
+1. COMMUNICATION SIGNATURE (How ${userName} expresses themselves)
    - Punctuation patterns (ellipses = uncertainty, exclamation points = excitement, etc.)
-   - Word emphasis techniques (capitals, quotes, italics)
-   - Unique phrases or vocabulary they use repeatedly
-   - How they structure their thinking (linear, circular, exploratory)
+   - Word emphasis techniques ${userName} uses (capitals, quotes, italics)
+   - Unique phrases or vocabulary ${userName} uses repeatedly
+   - How ${userName} structures their thinking (linear, circular, exploratory)
 
-2. EMOTIONAL PROCESSING STYLE
-   - Do they process feelings before logic or logic before feelings?
-   - Do they need to "talk through" to figure things out?
-   - What emotions trigger action vs paralysis?
-   - How do they describe their emotional state?
+2. EMOTIONAL PROCESSING STYLE (How ${userName} processes emotions)
+   - Does ${userName} process feelings before logic or logic before feelings?
+   - Does ${userName} need to "talk through" to figure things out?
+   - What emotions trigger action vs paralysis for ${userName}?
+   - How does ${userName} describe their emotional state?
 
-3. TRANSFORMATION TRIGGERS
-   - What creates breakthroughs for them? (validation, challenge, questions, data, stories)
-   - When do they say "yes" to action? (after analysis, after feeling ready, impulsively)
-   - What patterns show growth or stuck-ness?
+3. TRANSFORMATION TRIGGERS (What creates breakthroughs for ${userName})
+   - What creates breakthroughs for ${userName}? (validation, challenge, questions, data, stories)
+   - When does ${userName} say "yes" to action? (after analysis, after feeling ready, impulsively)
+   - What patterns show ${userName}'s growth or stuck-ness?
 
-4. DECISION-MAKING PATTERNS
-   - Do they seek permission, validation, or just inform?
-   - How much certainty do they need before moving forward?
-   - Do they decide quickly or need time to process?
+4. DECISION-MAKING PATTERNS (How ${userName} makes decisions)
+   - Does ${userName} seek permission, validation, or just inform?
+   - How much certainty does ${userName} need before moving forward?
+   - Does ${userName} decide quickly or need time to process?
 
-5. MICRO-PATTERNS & NUANCES
-   - Specific words/phrases that reveal their worldview
-   - Beliefs about themselves they're revealing
-   - Gaps between what they say and what they might actually need
-   - Resistance patterns (what they're avoiding saying or doing)
+5. MICRO-PATTERNS & NUANCES (${userName}'s unique worldview)
+   - Specific words/phrases that reveal ${userName}'s worldview
+   - Beliefs ${userName} has about themselves that they're revealing
+   - Gaps between what ${userName} says and what they might actually need
+   - Resistance patterns (what ${userName} is avoiding saying or doing)
 
-For each significant pattern you identify, return in this format:
+For each significant pattern you identify about ${userName}, return in this format:
 
 CATEGORY: [category name]
-NOTE: [2-3 sentence specific observation about THIS person, not generic coaching advice]
+NOTE: [2-3 sentence specific observation about ${userName}'s behavior, communication, or processing style - use ${userName}'s name naturally]
 TAGS: [relevant tags for this insight]
 
 If you identify multiple patterns, separate them with "---"
 
-If no significant patterns emerge, respond with "NONE".
+If no significant patterns emerge about ${userName}, respond with "NONE".
 
-Be SPECIFIC to this individual. Avoid generic observations. Focus on the nuances that make their way of operating unique.`
+REMEMBER: You are analyzing ${userName} (the person asking questions and being coached), NOT Sol (the AI coach). Focus on what ${userName}'s messages reveal about how ${userName} operates, thinks, feels, and communicates.
+
+Be SPECIFIC to ${userName} as an individual. Avoid generic observations. Focus on the nuances that make ${userName}'s way of operating unique.`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -158,7 +198,7 @@ Be SPECIFIC to this individual. Avoid generic observations. Focus on the nuances
     })
 
     if (!response.ok) {
-      console.error('Personalgorithmâ„¢ analysis failed:', response.status)
+      console.error('Personalgorithm™ analysis failed:', response.status)
       return null
     }
 
@@ -169,14 +209,13 @@ Be SPECIFIC to this individual. Avoid generic observations. Focus on the nuances
       return null
     }
     
-    // Parse the structured response
     const insights = parsePersonalgorithmInsights(analysisText)
     
-    console.log(`Generated ${insights.length} Personalgorithmâ„¢ insights`)
+    console.log(`Generated ${insights.length} Personalgorithm™ insights`)
     return insights
 
   } catch (error) {
-    console.error('Error generating Personalgorithmâ„¢ insights:', error)
+    console.error('Error generating Personalgorithm™ insights:', error)
     return null
   }
 }
@@ -204,7 +243,6 @@ function parsePersonalgorithmInsights(analysisText) {
 
 async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated') {
   try {
-    // CRITICAL: Get the User record ID for proper linking
     const userRecordId = await getUserRecordId(email)
     if (!userRecordId) {
       console.error('❌ Cannot create Personalgorithm™ entry - user record not found for:', email)
@@ -213,7 +251,6 @@ async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated')
 
     const personalgorithmId = `p_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
-    // URL-encode the table name (it has a ™ symbol)
     const tableName = 'Personalgorithm™'
     const encodedTableName = encodeURIComponent(tableName)
     
