@@ -609,7 +609,11 @@ async function fetchRecentMessages(email, limit = 2) {
 
 async function fetchRelevantCoachingMethods(messageLower) {
   try {
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned BusinessÂ® Method?maxRecords=10`
+    const tableName = 'Aligned Business® Method'
+    const encodedTableName = encodeURIComponent(tableName)
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodedTableName}?maxRecords=10`
+    
+    console.log('Fetching coaching methods from:', tableName)
     
     const response = await fetch(url, {
       headers: {
@@ -618,8 +622,14 @@ async function fetchRelevantCoachingMethods(messageLower) {
       }
     })
 
-    if (!response.ok) return []
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`Failed to fetch coaching methods (${response.status}):`, errorText)
+      return []
+    }
+    
     const data = await response.json()
+    console.log(`✅ Coaching methods loaded: ${data.records.length} methods`)
     
     // Filter methods relevant to the message
     return data.records
@@ -641,13 +651,13 @@ async function fetchRelevantCoachingMethods(messageLower) {
 
 // ==================== SOL™ BRAIN CONTEXT ====================
 
-
-// ==================== SOL™ BRAIN CONTEXT ====================
-
 async function fetchRelevantSolBrain(messageLower) {
   try {
-    const tableName = encodeURIComponent('Sol™ "Brain"')
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${tableName}?maxRecords=20`
+    const tableName = 'Sol™'
+    const encodedTableName = encodeURIComponent(tableName)
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodedTableName}?maxRecords=20`
+    
+    console.log('Fetching Sol Brain from:', tableName)
     
     const response = await fetch(url, {
       headers: {
@@ -655,35 +665,22 @@ async function fetchRelevantSolBrain(messageLower) {
         'Content-Type': 'application/json'
       }
     })
-    
+
     if (!response.ok) {
-      console.error('Failed to fetch Sol Brain:', response.statusText)
+      const errorText = await response.text()
+      console.error(`Failed to fetch Sol Brain (${response.status}):`, errorText)
       return []
     }
     
     const data = await response.json()
+    console.log(`✅ Sol Brain loaded: ${data.records.length} principles`)
     
-    // Filter for relevant principles
-    const relevant = data.records
-      .filter(record => {
-        const note = (record.fields['Sol™ Note'] || '').toLowerCase()
-        const tags = (record.fields['Tags'] || '').toLowerCase()
-        
-        return (
-          (messageLower.match(/stuck|uncertain|confused|scared/) && tags.includes('mindset')) ||
-          (messageLower.match(/pricing|sales|marketing/) && tags.includes('business')) ||
-          (messageLower.match(/goal|vision|direction/) && tags.includes('strategy'))
-        )
-      })
-      .map(r => ({
-        note: r.fields['Sol™ Note'],
-        category: r.fields['Category'],
-        tags: r.fields['Tags']
+    return data.records
+      .map(record => ({
+        note: record.fields['Note'],
+        tags: record.fields['Tags'] || ''
       }))
-    
-    console.log(`📋 Found ${relevant.length} relevant Sol Brain principles`)
-    return relevant
-    
+      .filter(brain => brain.note)
   } catch (error) {
     console.error('Error fetching Sol Brain:', error)
     return []
