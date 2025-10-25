@@ -557,7 +557,12 @@ async function fetchUserProfile(email) {
 async function fetchTopPersonalgorithm(email, limit = 5) {
   try {
     const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Personalgorithmâ„¢?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=${limit}`
+    
+    // URL-encode the table name
+    const tableName = 'Personalgorithm™'
+    const encodedTableName = encodeURIComponent(tableName)
+    
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodedTableName}?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date created&sort[0][direction]=desc&maxRecords=${limit}`
     
     const response = await fetch(url, {
       headers: {
@@ -566,12 +571,16 @@ async function fetchTopPersonalgorithm(email, limit = 5) {
       }
     })
 
-    if (!response.ok) return []
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`Failed to fetch Personalgorithm™ entries (${response.status}):`, errorText)
+      return []
+    }
+    
     const data = await response.json()
     
     return data.records.map(record => ({
-      id: record.id,
-      notes: record.fields['Personalgorithmâ„¢ Notes'],
+      notes: record.fields['Personalgorithm™ Notes'],
       dateCreated: record.fields['Date created'],
       tags: record.fields['Tags'] || ''
     })).filter(item => item.notes)
@@ -690,7 +699,14 @@ async function fetchRelevantSolBrain(messageLower) {
 async function fetchLatestBusinessPlan(email) {
   try {
     const encodedEmail = encodeURIComponent(email)
-    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/Aligned BusinessÂ® Plans?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date Submitted&sort[0][direction]=desc&maxRecords=1`
+    
+    // URL-encode the table name
+    const tableName = 'Aligned Business® Plans'
+    const encodedTableName = encodeURIComponent(tableName)
+    
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${encodedTableName}?filterByFormula={User ID}="${encodedEmail}"&sort[0][field]=Date Submitted&sort[0][direction]=desc&maxRecords=1`
+    
+    console.log('Fetching business plan from:', tableName)
     
     const response = await fetch(url, {
       headers: {
@@ -699,10 +715,20 @@ async function fetchLatestBusinessPlan(email) {
       }
     })
 
-    if (!response.ok) return null
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`Failed to fetch business plan (${response.status}):`, errorText)
+      return null
+    }
+    
     const data = await response.json()
     
-    return data.records.length > 0 ? data.records[0].fields : null
+    if (data.records.length > 0) {
+      console.log('✅ Business plan loaded')
+      return data.records[0].fields
+    }
+    
+    return null
   } catch (error) {
     console.error('Error fetching business plan:', error)
     return null
