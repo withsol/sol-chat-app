@@ -479,6 +479,38 @@ function queuePersonalgorithmAnalysis(email, userMessage, solResponse, conversat
   }, 2000) // 2 second delay
 }
 
+// ==================== PERSONALGORITHM™ ANALYSIS TRIGGER ====================
+
+function queuePersonalgorithmAnalysis(email, userMessage, solResponse, conversationHistory) {
+  // NON-BLOCKING call to Personalgorithm™ analysis
+  const url = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  
+  console.log('🧠 Queuing Personalgorithm™ analysis for regular message...')
+  
+  fetch(`${url}/api/analyze-message-personalgorithm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      userMessage,
+      solResponse,
+      conversationContext: conversationHistory.slice(-4) // Last 4 messages for context
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success && data.entriesCreated > 0) {
+      console.log(`✅ Personalgorithm™ analysis completed: ${data.entriesCreated} insights created`)
+    } else {
+      console.log('ℹ️ Personalgorithm™ analysis: No new patterns detected')
+    }
+  })
+  .catch(error => {
+    console.error('❌ Personalgorithm™ analysis failed (non-blocking):', error.message)
+    // Don't throw - this is background processing
+  })
+}
+
 // ==================== AIRTABLE HELPER FUNCTIONS ====================
 
 async function fetchUserProfile(email) {
@@ -583,6 +615,70 @@ async function fetchRelevantCoachingMethods(messageLower) {
       })
   } catch (error) {
     console.error('Error fetching coaching methods:', error)
+    return []
+  }
+}
+
+// ==================== SOL™ BRAIN CONTEXT ====================
+
+async function fetchRelevantSolBrain(messageLower) {
+  try {
+    const tableName = encodeURIComponent('Sol™ "Brain"')
+    const url = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${tableName}?maxRecords=20`
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${process.env.AIRTABLE_TOKEN}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (!response.ok) {
+      console.error('Failed to fetch Sol Brain:', response.statusText)
+      return []
+    }
+    
+    const data = await response.json()
+    
+    // Filter for relevant principles based on message content
+    const relevant = data.records
+      .filter(record => {
+        const note = (record.fields['Sol™ Note'] || '').toLowerCase()
+        const tags = (record.fields['Tags'] || '').toLowerCase()
+        const category = (record.fields['Category'] || '').toLowerCase()
+        
+        // Check if this principle is relevant to the message
+        const isRelevant = (
+          // Mindset/emotional support
+          (messageLower.match(/stuck|uncertain|confused|scared|overwhelmed|anxious|worried/) && 
+           (tags.includes('mindset') || category.includes('emotional') || tags.includes('support'))) ||
+          
+          // Business/strategy
+          (messageLower.match(/pricing|sales|marketing|launch|revenue|business|strategy/) && 
+           (tags.includes('business') || category.includes('strategy') || tags.includes('sales'))) ||
+          
+          // Goals/vision/direction
+          (messageLower.match(/goal|vision|direction|next step|focus|priority|purpose/) && 
+           (tags.includes('strategy') || tags.includes('clarity') || category.includes('vision'))) ||
+          
+          // Client work
+          (messageLower.match(/client|customer|buyer|audience/) && 
+           (tags.includes('client') || category.includes('client')))
+        )
+        
+        return isRelevant
+      })
+      .map(r => ({
+        note: r.fields['Sol™ Note'],
+        category: r.fields['Category'],
+        tags: r.fields['Tags']
+      }))
+    
+    console.log(`📋 Found ${relevant.length} relevant Sol Brain principles`)
+    return relevant
+    
+  } catch (error) {
+    console.error('Error fetching Sol Brain:', error)
     return []
   }
 }
