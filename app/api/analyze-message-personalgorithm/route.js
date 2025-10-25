@@ -228,7 +228,7 @@ async function createPersonalgorithmEntry(email, notes, tags = 'auto-generated')
       body: JSON.stringify({
         fields: {
           'Personalgorithm™ ID': personalgorithmId,
-          'User': [userRecordId],
+          'User ID': [userRecordId], // ✅ FIXED: Changed from 'User' to 'User ID'
           'Personalgorithm™ Notes': notes,
           'Date created': new Date().toISOString(),
           'Tags': typeof tags === 'string' ? tags : tags.join(', ')
